@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, ChevronDown } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
@@ -35,7 +35,6 @@ export default function NewLoanPage() {
   const [penaltyRate, setPenaltyRate] = useState('');
   const [penaltyFrequency, setPenaltyFrequency] = useState<'daily' | 'monthly' | 'one_time' | ''>('');
   const [customScheduleDates, setCustomScheduleDates] = useState<Record<number, string>>({});
-  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const router = useRouter();
@@ -320,78 +319,65 @@ export default function NewLoanPage() {
           <p className="text-xs text-status-overdue">Due date must be after the loan date.</p>
         )}
 
-        {/* Advanced: Late Payment Rules */}
-        <button
-          type="button"
-          onClick={() => setAdvancedOpen(!advancedOpen)}
-          className="flex items-center gap-2 text-sm text-muted-foreground hover:text-on-surface transition-colors"
-        >
-          <ChevronDown size={14} className={`transition-transform ${advancedOpen ? 'rotate-180' : ''}`} />
-          Late Payment Rules
-        </button>
-        {advancedOpen && (
-          <div className="space-y-4 bg-surface-lowest rounded-md p-4">
-            <div className="space-y-2">
-              <Label className="text-label-md text-muted-foreground">Grace Period (days)</Label>
-              <Input
-                type="number"
-                value={gracePeriodDays || ''}
-                onChange={(e) => setGracePeriodDays(parseInt(e.target.value) || 0)}
-                className="h-10 bg-surface-high border-0 text-on-surface"
-                placeholder="0"
-                min="0"
-              />
-              <p className="text-xs text-muted-foreground">Days after due date before penalty applies.</p>
-            </div>
-            {gracePeriodDays > 0 && (
-              <>
-                <div className="space-y-2">
-                  <Label className="text-label-md text-muted-foreground">Penalty Type</Label>
-                  <Select value={penaltyType} onValueChange={(v) => setPenaltyType(v as 'percentage' | 'fixed_amount')}>
-                    <SelectTrigger className="h-10 bg-surface-high border-0">
-                      <SelectValue placeholder="Select penalty type...">
-                        {penaltyType === 'percentage' ? 'Percentage' : penaltyType === 'fixed_amount' ? 'Fixed Amount' : undefined}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent className="bg-surface-lowest">
-                      <SelectItem value="percentage">Percentage</SelectItem>
-                      <SelectItem value="fixed_amount">Fixed Amount</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-label-md text-muted-foreground">
-                    Penalty Rate {penaltyType === 'percentage' ? '(%)' : penaltyType === 'fixed_amount' ? '(₱)' : ''}
-                  </Label>
-                  <Input
-                    type="number"
-                    value={penaltyRate}
-                    onChange={(e) => setPenaltyRate(e.target.value)}
-                    className="h-10 bg-surface-high border-0 text-on-surface"
-                    placeholder="0"
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-label-md text-muted-foreground">Penalty Frequency</Label>
-                  <Select value={penaltyFrequency} onValueChange={(v) => setPenaltyFrequency(v as 'daily' | 'monthly' | 'one_time')}>
-                    <SelectTrigger className="h-10 bg-surface-high border-0">
-                      <SelectValue placeholder="Select frequency...">
-                        {penaltyFrequency === 'daily' ? 'Daily' : penaltyFrequency === 'monthly' ? 'Monthly' : penaltyFrequency === 'one_time' ? 'One-time' : undefined}
-                      </SelectValue>
-                    </SelectTrigger>
-                    <SelectContent className="bg-surface-lowest">
-                      <SelectItem value="daily">Daily</SelectItem>
-                      <SelectItem value="monthly">Monthly</SelectItem>
-                      <SelectItem value="one_time">One-time</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </>
-            )}
+        {/* Late Payment Rules */}
+        <div className="space-y-4">
+          <p className="text-label-md text-muted-foreground">Late Payment Rules</p>
+          <div className="space-y-2">
+            <Label className="text-label-md text-muted-foreground">Grace Period (days)</Label>
+            <Input
+              type="number"
+              value={gracePeriodDays || ''}
+              onChange={(e) => setGracePeriodDays(parseInt(e.target.value) || 0)}
+              className="h-12 bg-surface-lowest border-0 text-on-surface"
+              placeholder="0"
+              min="0"
+            />
+            <p className="text-xs text-muted-foreground">Days after due date before penalty applies.</p>
           </div>
-        )}
+          <div className="space-y-2">
+            <Label className="text-label-md text-muted-foreground">Penalty Type</Label>
+            <Select value={penaltyType} onValueChange={(v) => setPenaltyType(v as 'percentage' | 'fixed_amount')}>
+              <SelectTrigger className="h-12 bg-surface-lowest border-0">
+                <SelectValue placeholder="Select penalty type...">
+                  {penaltyType === 'percentage' ? 'Percentage' : penaltyType === 'fixed_amount' ? 'Fixed Amount' : undefined}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent className="bg-surface-lowest">
+                <SelectItem value="percentage">Percentage</SelectItem>
+                <SelectItem value="fixed_amount">Fixed Amount</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-label-md text-muted-foreground">
+              Penalty Rate {penaltyType === 'percentage' ? '(%)' : penaltyType === 'fixed_amount' ? '(₱)' : ''}
+            </Label>
+            <Input
+              type="number"
+              value={penaltyRate}
+              onChange={(e) => setPenaltyRate(e.target.value)}
+              className="h-12 bg-surface-lowest border-0 text-on-surface"
+              placeholder="0"
+              min="0"
+              step="0.01"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-label-md text-muted-foreground">Penalty Frequency</Label>
+            <Select value={penaltyFrequency} onValueChange={(v) => setPenaltyFrequency(v as 'daily' | 'monthly' | 'one_time')}>
+              <SelectTrigger className="h-12 bg-surface-lowest border-0">
+                <SelectValue placeholder="Select frequency...">
+                  {penaltyFrequency === 'daily' ? 'Daily' : penaltyFrequency === 'monthly' ? 'Monthly' : penaltyFrequency === 'one_time' ? 'One-time' : undefined}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent className="bg-surface-lowest">
+                <SelectItem value="daily">Daily</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+                <SelectItem value="one_time">One-time</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
 
         <div className="space-y-2">
           <Label className="text-label-md text-muted-foreground">Notes (Optional)</Label>
