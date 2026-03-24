@@ -167,11 +167,15 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         <div className="bg-surface-lowest rounded-md p-4 space-y-1">
           <div className="flex items-center justify-between">
-            <p className="text-label-sm text-muted-foreground">Active Borrowers</p>
+            <p className="text-label-sm text-muted-foreground">
+              Active Borrowers
+            </p>
             <Users size={16} className="text-muted-foreground" />
           </div>
-          <p className={`text-headline-lg text-on-surface ${loading ? 'animate-pulse' : ''}`}>
-            {loading ? '—' : stats.active_borrowers}
+          <p
+            className={`text-headline-lg text-on-surface ${loading ? "animate-pulse" : ""}`}
+          >
+            {loading ? "—" : stats.active_borrowers}
           </p>
         </div>
 
@@ -180,38 +184,52 @@ export default function DashboardPage() {
             <p className="text-label-sm text-muted-foreground">Total Lent</p>
             <DollarSign size={16} className="text-muted-foreground" />
           </div>
-          <p className={`text-headline-lg text-on-surface ${loading ? 'animate-pulse' : ''}`}>
-            {loading ? '—' : formatCurrency(stats.total_lent)}
+          <p
+            className={`text-headline-lg text-on-surface ${loading ? "animate-pulse" : ""}`}
+          >
+            {loading ? "—" : formatCurrency(stats.total_lent)}
           </p>
         </div>
 
         <div className="bg-surface-lowest rounded-md p-4 space-y-1">
           <div className="flex items-center justify-between">
-            <p className="text-label-sm text-muted-foreground">Available to Lend</p>
+            <p className="text-label-sm text-muted-foreground">
+              Available to Lend
+            </p>
             <Wallet size={16} className="text-muted-foreground" />
           </div>
-          <p className={`text-headline-lg text-on-surface ${loading ? 'animate-pulse' : ''}`}>
-            {loading ? '—' : formatCurrency(stats.available_to_lend)}
+          <p
+            className={`text-headline-lg text-on-surface ${loading ? "animate-pulse" : ""}`}
+          >
+            {loading ? "—" : formatCurrency(stats.available_to_lend)}
           </p>
         </div>
 
         <div className="bg-surface-lowest rounded-md p-4 space-y-1">
           <div className="flex items-center justify-between">
-            <p className="text-label-sm text-muted-foreground">Total Interest</p>
+            <p className="text-label-sm text-muted-foreground">
+              Total Interest
+            </p>
             <TrendingUp size={16} className="text-green-500" />
           </div>
-          <p className={`text-headline-lg text-green-500 ${loading ? 'animate-pulse' : ''}`}>
-            {loading ? '—' : formatCurrency(stats.total_interest)}
+          <p
+            className={`text-headline-lg text-green-500 ${loading ? "animate-pulse" : ""}`}
+          >
+            {loading ? "—" : formatCurrency(stats.total_interest)}
           </p>
         </div>
 
         <div className="bg-surface-lowest rounded-md p-4 space-y-1">
           <div className="flex items-center justify-between">
-            <p className="text-label-sm text-muted-foreground">Penalties Collected</p>
+            <p className="text-label-sm text-muted-foreground">
+              Penalties Collected
+            </p>
             <AlertTriangle size={16} className="text-status-overdue" />
           </div>
-          <p className={`text-headline-lg text-status-overdue ${loading ? 'animate-pulse' : ''}`}>
-            {loading ? '—' : formatCurrency(stats.total_penalties)}
+          <p
+            className={`text-headline-lg text-status-overdue ${loading ? "animate-pulse" : ""}`}
+          >
+            {loading ? "—" : formatCurrency(stats.total_penalties)}
           </p>
         </div>
       </div>
@@ -219,22 +237,23 @@ export default function DashboardPage() {
       {/* Quick Actions — vertical on mobile, horizontal on desktop */}
       <div className="flex flex-col sm:flex-row gap-3">
         <Button
-          className="h-12 flex-1 btn-primary-gradient text-on-primary font-medium"
-          onClick={() => router.push('/loans/new')}
+          variant="default"
+          className="sm:py-6 py-2 flex-1 font-medium"
+          onClick={() => router.push("/loans/new")}
         >
           <span className="mr-2">+</span> Create Loan
         </Button>
         <Button
-          variant="secondary"
-          className="h-12 flex-1 bg-surface-lowest text-on-surface font-medium"
-          onClick={() => router.push('/payments/new')}
+          variant="default"
+          className="sm:py-6 py-2 flex-1 font-medium"
+          onClick={() => router.push("/payments/new")}
         >
           <span className="mr-2">+</span> Record Payment
         </Button>
         <Button
-          variant="secondary"
-          className="h-12 flex-1 bg-surface-lowest text-on-surface font-medium"
-          onClick={() => router.push('/users')}
+          variant="default"
+          className="sm:py-6 py-2 flex-1 font-medium"
+          onClick={() => router.push("/users")}
         >
           <span className="mr-2">+</span> Add User
         </Button>
@@ -246,13 +265,21 @@ export default function DashboardPage() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-headline-sm text-on-surface">
-              {format(calendarMonth, 'MMMM yyyy')}
+              {format(calendarMonth, "MMMM yyyy")}
             </h2>
             <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setCalendarMonth(subMonths(calendarMonth, 1))}
+              >
                 <ChevronLeft size={16} />
               </Button>
-              <Button variant="ghost" size="icon" onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setCalendarMonth(addMonths(calendarMonth, 1))}
+              >
                 <ChevronRight size={16} />
               </Button>
             </div>
@@ -260,8 +287,13 @@ export default function DashboardPage() {
 
           <div className="bg-surface-lowest rounded-md p-3">
             <div className="grid grid-cols-7 mb-1">
-              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
-                <div key={i} className="text-center text-[10px] text-muted-foreground py-1">{d}</div>
+              {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
+                <div
+                  key={i}
+                  className="text-center text-[10px] text-muted-foreground py-1"
+                >
+                  {d}
+                </div>
               ))}
             </div>
             <div className="grid grid-cols-7 gap-y-0.5">
@@ -275,21 +307,28 @@ export default function DashboardPage() {
                     key={day.toISOString()}
                     onClick={() => setSelectedDate(day)}
                     className={`flex flex-col items-center py-1.5 rounded transition-colors text-xs ${
-                      !inMonth ? 'opacity-30' : ''
-                    } ${isSel ? 'bg-primary text-primary-foreground' : ''} ${
-                      isT && !isSel ? 'bg-surface-low' : ''
+                      !inMonth ? "opacity-30" : ""
+                    } ${isSel ? "bg-primary text-primary-foreground" : ""} ${
+                      isT && !isSel ? "bg-surface-low" : ""
                     }`}
                   >
-                    <span className="font-medium">{format(day, 'd')}</span>
+                    <span className="font-medium">{format(day, "d")}</span>
                     {daySchedules.length > 0 && (
                       <div className="flex gap-0.5 mt-0.5">
                         {daySchedules.slice(0, 3).map((s) => {
-                          const overdue = s.status === 'pending' && isBefore(new Date(s.due_date), new Date()) && !isSameDay(new Date(s.due_date), new Date());
+                          const overdue =
+                            s.status === "pending" &&
+                            isBefore(new Date(s.due_date), new Date()) &&
+                            !isSameDay(new Date(s.due_date), new Date());
                           return (
                             <div
                               key={s.id}
                               className={`w-1 h-1 rounded-full ${
-                                s.status === 'paid' ? 'bg-muted-foreground' : overdue ? 'bg-status-overdue' : 'bg-status-ontime'
+                                s.status === "paid"
+                                  ? "bg-muted-foreground"
+                                  : overdue
+                                    ? "bg-status-overdue"
+                                    : "bg-status-ontime"
                               }`}
                             />
                           );
@@ -305,7 +344,9 @@ export default function DashboardPage() {
           {/* Selected date events */}
           {selectedDate && selectedDateSchedules.length > 0 && (
             <div className="space-y-2">
-              <p className="text-label-sm text-muted-foreground">{format(selectedDate, 'MMMM d, yyyy')}</p>
+              <p className="text-label-sm text-muted-foreground">
+                {format(selectedDate, "MMMM d, yyyy")}
+              </p>
               {selectedDateSchedules.map((s) => {
                 const penalty = Number(s.penalty_amount) || 0;
                 return (
@@ -316,15 +357,25 @@ export default function DashboardPage() {
                   >
                     <div>
                       <p className="text-sm text-on-surface">
-                        {formatCurrency(Number(s.amount) + penalty)} · {(s.borrower as unknown as { full_name: string })?.full_name}
+                        {formatCurrency(Number(s.amount) + penalty)} ·{" "}
+                        {
+                          (s.borrower as unknown as { full_name: string })
+                            ?.full_name
+                        }
                       </p>
                       {penalty > 0 && (
-                        <p className="text-[10px] text-status-overdue">includes {formatCurrency(penalty)} penalty</p>
+                        <p className="text-[10px] text-status-overdue">
+                          includes {formatCurrency(penalty)} penalty
+                        </p>
                       )}
                     </div>
-                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
-                      s.status === 'paid' ? 'text-muted-foreground bg-muted-foreground/10' : 'text-status-ontime bg-status-ontime/10'
-                    }`}>
+                    <span
+                      className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                        s.status === "paid"
+                          ? "text-muted-foreground bg-muted-foreground/10"
+                          : "text-status-ontime bg-status-ontime/10"
+                      }`}
+                    >
                       {s.status}
                     </span>
                   </button>
@@ -341,26 +392,38 @@ export default function DashboardPage() {
             <div className="flex items-center justify-between">
               <h2 className="text-headline-sm text-on-surface">Active Loans</h2>
               <button
-                onClick={() => router.push('/loans')}
+                onClick={() => router.push("/loans")}
                 className="text-xs text-muted-foreground hover:text-on-surface transition-colors"
               >
                 View all
               </button>
             </div>
             {loading ? (
-              <div className="space-y-2">{[1, 2, 3].map(i => <div key={i} className="bg-surface-lowest rounded-md h-16 animate-pulse" />)}</div>
+              <div className="space-y-2">
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="bg-surface-lowest rounded-md h-16 animate-pulse"
+                  />
+                ))}
+              </div>
             ) : activeLoans.length === 0 ? (
               <div className="bg-surface-lowest rounded-md p-6 text-center">
-                <p className="text-sm text-muted-foreground">No active loans.</p>
+                <p className="text-sm text-muted-foreground">
+                  No active loans.
+                </p>
               </div>
             ) : (
               <div className="space-y-1 max-h-64 overflow-y-auto">
                 {activeLoans.slice(0, 10).map((loan) => {
-                  const borrowerName = (loan.borrower as unknown as { full_name: string })?.full_name ?? 'Unknown';
+                  const borrowerName =
+                    (loan.borrower as unknown as { full_name: string })
+                      ?.full_name ?? "Unknown";
                   const paid = Number(loan.amount_paid);
                   const total = Number(loan.total_amount);
-                  const progress = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
-                  const isOverdue = loan.status === 'overdue';
+                  const progress =
+                    total > 0 ? Math.min(100, (paid / total) * 100) : 0;
+                  const isOverdue = loan.status === "overdue";
                   return (
                     <button
                       key={loan.id}
@@ -369,18 +432,28 @@ export default function DashboardPage() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium text-on-surface truncate">{borrowerName}</p>
-                          {isOverdue && <AlertTriangle size={12} className="text-status-overdue shrink-0" />}
+                          <p className="text-sm font-medium text-on-surface truncate">
+                            {borrowerName}
+                          </p>
+                          {isOverdue && (
+                            <AlertTriangle
+                              size={12}
+                              className="text-status-overdue shrink-0"
+                            />
+                          )}
                         </div>
                         <div className="mt-1 h-1 w-full bg-surface-low rounded-full overflow-hidden">
-                          <div className="h-full bg-primary rounded-full" style={{ width: `${progress}%` }} />
+                          <div
+                            className="h-full bg-primary rounded-full"
+                            style={{ width: `${progress}%` }}
+                          />
                         </div>
                         <p className="text-[10px] text-muted-foreground mt-0.5">
                           {formatCurrency(paid)} / {formatCurrency(total)}
                         </p>
                       </div>
                       <p className="text-xs text-muted-foreground shrink-0">
-                        {format(new Date(loan.due_date), 'MMM d')}
+                        {format(new Date(loan.due_date), "MMM d")}
                       </p>
                     </button>
                   );
@@ -393,24 +466,37 @@ export default function DashboardPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-headline-sm text-on-surface">
-                {format(new Date(), 'MMMM')} Collections
+                {format(new Date(), "MMMM")} Collections
               </h2>
               <span className="text-label-sm text-muted-foreground">
                 {monthSchedules.length} pending
               </span>
             </div>
             {loading ? (
-              <div className="space-y-2">{[1, 2].map(i => <div key={i} className="bg-surface-lowest rounded-md h-14 animate-pulse" />)}</div>
+              <div className="space-y-2">
+                {[1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="bg-surface-lowest rounded-md h-14 animate-pulse"
+                  />
+                ))}
+              </div>
             ) : monthSchedules.length === 0 ? (
               <div className="bg-surface-lowest rounded-md p-6 text-center">
-                <p className="text-sm text-muted-foreground">No pending collections this month.</p>
+                <p className="text-sm text-muted-foreground">
+                  No pending collections this month.
+                </p>
               </div>
             ) : (
               <div className="space-y-1 max-h-64 overflow-y-auto">
                 {monthSchedules.map((s) => {
-                  const borrowerName = (s.borrower as unknown as { full_name: string })?.full_name ?? 'Unknown';
+                  const borrowerName =
+                    (s.borrower as unknown as { full_name: string })
+                      ?.full_name ?? "Unknown";
                   const penalty = Number(s.penalty_amount) || 0;
-                  const isOverdue = isBefore(new Date(s.due_date), new Date()) && !isSameDay(new Date(s.due_date), new Date());
+                  const isOverdue =
+                    isBefore(new Date(s.due_date), new Date()) &&
+                    !isSameDay(new Date(s.due_date), new Date());
                   return (
                     <button
                       key={s.id}
@@ -419,15 +505,23 @@ export default function DashboardPage() {
                     >
                       <div className="flex items-center gap-2">
                         {isOverdue ? (
-                          <AlertTriangle size={14} className="text-status-overdue shrink-0" />
+                          <AlertTriangle
+                            size={14}
+                            className="text-status-overdue shrink-0"
+                          />
                         ) : (
-                          <Clock size={14} className="text-status-ontime shrink-0" />
+                          <Clock
+                            size={14}
+                            className="text-status-ontime shrink-0"
+                          />
                         )}
                         <div>
-                          <p className="text-sm text-on-surface">{borrowerName}</p>
+                          <p className="text-sm text-on-surface">
+                            {borrowerName}
+                          </p>
                           <p className="text-[10px] text-muted-foreground">
-                            Due {format(new Date(s.due_date), 'MMM d')}
-                            {isOverdue && ' · overdue'}
+                            Due {format(new Date(s.due_date), "MMM d")}
+                            {isOverdue && " · overdue"}
                           </p>
                         </div>
                       </div>
@@ -436,7 +530,9 @@ export default function DashboardPage() {
                           {formatCurrency(Number(s.amount) + penalty)}
                         </p>
                         {penalty > 0 && (
-                          <p className="text-[10px] text-status-overdue">+{formatCurrency(penalty)}</p>
+                          <p className="text-[10px] text-status-overdue">
+                            +{formatCurrency(penalty)}
+                          </p>
                         )}
                       </div>
                     </button>
@@ -444,7 +540,16 @@ export default function DashboardPage() {
                 })}
                 <div className="px-3 pt-1">
                   <p className="text-label-sm text-muted-foreground">
-                    Total: {formatCurrency(monthSchedules.reduce((sum, s) => sum + Number(s.amount) + (Number(s.penalty_amount) || 0), 0))}
+                    Total:{" "}
+                    {formatCurrency(
+                      monthSchedules.reduce(
+                        (sum, s) =>
+                          sum +
+                          Number(s.amount) +
+                          (Number(s.penalty_amount) || 0),
+                        0,
+                      ),
+                    )}
                   </p>
                 </div>
               </div>
