@@ -7,7 +7,7 @@ import { Plus, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, toDate } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
@@ -246,7 +246,7 @@ export default function PaymentsPage() {
                     {formatCurrency(payment.amount, { sign: true })}
                   </p>
                   <p className="text-xs text-muted-foreground text-right">
-                    {format(new Date(payment.payment_date), 'MMM d, yyyy')}
+                    {format(toDate(payment.payment_date), 'MMM d, yyyy')}
                   </p>
                   <p className="text-xs text-muted-foreground text-right truncate">
                     {payment.notes || '—'}

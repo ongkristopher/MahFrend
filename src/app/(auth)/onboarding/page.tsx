@@ -2,7 +2,6 @@
 
 import { createClient } from '@/lib/supabase/client';
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,7 +11,6 @@ export default function OnboardingPage() {
   const [fullName, setFullName] = useState('');
   const [loanableAmount, setLoanableAmount] = useState('');
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
   const supabase = createClient();
 
   const handleComplete = async () => {
@@ -43,8 +41,8 @@ export default function OnboardingPage() {
         );
     }
 
-    router.push('/dashboard');
-    router.refresh();
+    // Hard redirect to force middleware to re-evaluate the session
+    window.location.href = '/dashboard';
   };
 
   return (

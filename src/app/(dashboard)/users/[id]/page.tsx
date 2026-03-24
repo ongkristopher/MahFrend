@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { format } from 'date-fns';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, toDate } from '@/lib/utils';
 import type { Borrower, LoanEntry, PaymentSchedule } from '@/types/database';
 
 interface PaymentRow {
@@ -323,7 +323,7 @@ export default function UserDetailPage() {
                           </span>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          Due {format(new Date(loan.due_date), 'MMM d, yyyy')} · {formatCurrency(loan.amount_paid)} / {formatCurrency(loan.total_amount)} paid
+                          Due {format(toDate(loan.due_date), 'MMM d, yyyy')} · {formatCurrency(loan.amount_paid)} / {formatCurrency(loan.total_amount)} paid
                         </p>
                       </div>
                     </div>
@@ -352,7 +352,7 @@ export default function UserDetailPage() {
                               }`} />
                               <span className="text-xs text-muted-foreground w-5">#{i + 1}</span>
                               <span className="text-sm text-on-surface">
-                                {format(new Date(s.due_date), 'MMM d, yyyy')}
+                                {format(toDate(s.due_date), 'MMM d, yyyy')}
                               </span>
                             </div>
                             <div className="flex items-center gap-2">
@@ -401,7 +401,7 @@ export default function UserDetailPage() {
                   {formatCurrency(payment.amount, { sign: true })}
                 </p>
                 <p className="text-xs text-muted-foreground text-right">
-                  {format(new Date(payment.payment_date), 'MMM d, yyyy')}
+                  {format(toDate(payment.payment_date), 'MMM d, yyyy')}
                 </p>
                 <p className="text-xs text-muted-foreground text-right truncate">
                   {payment.notes || '—'}

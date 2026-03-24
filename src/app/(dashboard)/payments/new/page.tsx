@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { format, isBefore } from 'date-fns';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, toDate } from '@/lib/utils';
 import type { Borrower, LoanEntry, PaymentSchedule } from '@/types/database';
 
 export default function NewPaymentPage() {
@@ -162,7 +162,7 @@ function NewPaymentForm() {
 
   const selectedBorrowerName = borrowers.find(b => b.id === selectedBorrower)?.full_name;
   const selectedLoanLabel = selectedLoanData
-    ? `${formatCurrency(selectedLoanData.total_amount)} — Due ${format(new Date(selectedLoanData.due_date), 'MMM d, yyyy')}`
+    ? `${formatCurrency(selectedLoanData.total_amount)} — Due ${format(toDate(selectedLoanData.due_date), 'MMM d, yyyy')}`
     : undefined;
 
   const handleSubmit = async () => {
@@ -286,7 +286,7 @@ function NewPaymentForm() {
             <SelectContent className="bg-surface-lowest">
               {loans.map((l) => (
                 <SelectItem key={l.id} value={l.id}>
-                  {formatCurrency(l.total_amount)} — Due {format(new Date(l.due_date), 'MMM d, yyyy')}
+                  {formatCurrency(l.total_amount)} — Due {format(toDate(l.due_date), 'MMM d, yyyy')}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -305,7 +305,7 @@ function NewPaymentForm() {
                 const scheduleIndex = schedules.findIndex(s => s.id === schedule.id);
                 const penalty = getPenalty(schedule);
                 const totalDue = Number(schedule.amount) + penalty;
-                const isOverdue = isBefore(new Date(schedule.due_date), new Date());
+                const isOverdue = isBefore(toDate(schedule.due_date), new Date());
                 return (
                   <button
                     key={schedule.id}
@@ -328,7 +328,7 @@ function NewPaymentForm() {
                       <div className="text-left">
                         <span className="text-xs text-muted-foreground">#{scheduleIndex + 1}</span>
                         <span className={`text-sm ml-2 ${isOverdue ? 'text-status-overdue' : 'text-on-surface'}`}>
-                          {format(new Date(schedule.due_date), 'MMM d, yyyy')}
+                          {format(toDate(schedule.due_date), 'MMM d, yyyy')}
                         </span>
                         {isOverdue && (
                           <span className="text-[10px] text-status-overdue ml-1">overdue</span>

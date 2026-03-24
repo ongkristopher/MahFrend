@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, toDate } from '@/lib/utils';
 import type { LoanEntry } from '@/types/database';
 
 export default function LoansPage() {
@@ -138,7 +138,7 @@ export default function LoansPage() {
                       >
                         <div className="min-w-0">
                           <p className="text-xs text-muted-foreground">
-                            Due {format(new Date(loan.due_date), 'MMM d, yyyy')}
+                            Due {format(toDate(loan.due_date), 'MMM d, yyyy')}
                           </p>
                           <div className="mt-1 h-1 w-full bg-surface-low rounded-full overflow-hidden">
                             <div

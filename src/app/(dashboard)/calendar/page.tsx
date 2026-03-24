@@ -20,7 +20,7 @@ import {
 } from 'date-fns';
 import { ChevronLeft, ChevronRight, AlertTriangle, Clock, CheckCircle, Banknote, ArrowDownCircle, FilePlus2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, toDate } from '@/lib/utils';
 import type { PaymentSchedule, Borrower } from '@/types/database';
 
 interface CalendarSchedule extends PaymentSchedule {
@@ -100,7 +100,7 @@ export default function CalendarPage() {
       if (schedulesRes.data) {
         const today = new Date();
         const enriched = schedulesRes.data.map((schedule) => {
-          const dueDate = new Date(schedule.due_date);
+          const dueDate = toDate(schedule.due_date);
 
           let display_status: 'on-time' | 'approaching' | 'overdue' | 'paid';
           if (schedule.status === 'paid') {
@@ -164,13 +164,13 @@ export default function CalendarPage() {
   const calendarDays = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
   const getSchedulesForDate = (date: Date) =>
-    schedules.filter((s) => isSameDay(new Date(s.due_date), date));
+    schedules.filter((s) => isSameDay(toDate(s.due_date), date));
 
   const getPaymentsForDate = (date: Date) =>
-    payments.filter((p) => isSameDay(new Date(p.payment_date), date));
+    payments.filter((p) => isSameDay(toDate(p.payment_date), date));
 
   const getLoansForDate = (date: Date) =>
-    loans.filter((l) => isSameDay(new Date(l.created_at), date));
+    loans.filter((l) => isSameDay(toDate(l.created_at), date));
 
   const getEventsForDate = (date: Date): CalendarEvent[] => {
     const l = getLoansForDate(date).map((d) => ({ type: 'loan' as const, data: d }));
@@ -188,7 +188,7 @@ export default function CalendarPage() {
     }
   };
 
-  const formatTime = (dateStr: string) => format(new Date(dateStr), 'h:mm a');
+  const formatTime = (dateStr: string) => format(toDate(dateStr), 'h:mm a');
 
   const handleRecordPayment = (e: React.MouseEvent, schedule: CalendarSchedule) => {
     e.stopPropagation();
@@ -197,7 +197,7 @@ export default function CalendarPage() {
 
   // Filter schedules to current month only
   const monthPendingSchedules = useMemo(() =>
-    schedules.filter((s) => s.status === 'pending' && isSameMonth(new Date(s.due_date), currentMonth)),
+    schedules.filter((s) => s.status === 'pending' && isSameMonth(toDate(s.due_date), currentMonth)),
     [schedules, currentMonth]
   );
   const overdueSchedules = monthPendingSchedules.filter((s) => s.display_status === 'overdue');
@@ -378,7 +378,7 @@ export default function CalendarPage() {
                       {formatCurrency(evt.data.amount)} · {evt.data.borrower?.full_name}
                     </p>
                     <p className="text-body-md text-muted-foreground">
-                      Due {format(new Date(evt.data.due_date), 'MMM d')} · {evt.data.status === 'paid' ? 'Paid' : 'Pending'}
+                      Due {format(toDate(evt.data.due_date), 'MMM d')} · {evt.data.status === 'paid' ? 'Paid' : 'Pending'}
                     </p>
                     <p className="text-xs text-muted-foreground">{formatTime(evt.data.created_at)}</p>
                   </div>
@@ -418,7 +418,7 @@ export default function CalendarPage() {
                     {formatCurrency(s.amount)} · {s.borrower?.full_name}
                   </p>
                   <p className="text-body-md text-muted-foreground">
-                    Due {format(new Date(s.due_date), 'MMM d')} · {Math.abs(differenceInDays(new Date(s.due_date), new Date()))} days late
+                    Due {format(toDate(s.due_date), 'MMM d')} · {Math.abs(differenceInDays(toDate(s.due_date), new Date()))} days late
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -454,7 +454,7 @@ export default function CalendarPage() {
                     {formatCurrency(s.amount)} · {s.borrower?.full_name}
                   </p>
                   <p className="text-body-md text-muted-foreground">
-                    Due {format(new Date(s.due_date), 'MMM d')}
+                    Due {format(toDate(s.due_date), 'MMM d')}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -490,7 +490,7 @@ export default function CalendarPage() {
                     {formatCurrency(s.amount)} · {s.borrower?.full_name}
                   </p>
                   <p className="text-body-md text-muted-foreground">
-                    Due {format(new Date(s.due_date), 'MMM d')}
+                    Due {format(toDate(s.due_date), 'MMM d')}
                   </p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">

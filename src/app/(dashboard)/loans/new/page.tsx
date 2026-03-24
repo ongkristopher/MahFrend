@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { addMonths, differenceInCalendarMonths, endOfMonth, format, setDate } from 'date-fns';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, safeDate } from '@/lib/utils';
 import type { Borrower } from '@/types/database';
 
 export default function NewLoanPage() {
@@ -71,31 +71,38 @@ export default function NewLoanPage() {
   const handleSliderChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const months = parseInt(e.target.value);
     setDurationMonths(months);
-    setDueDate(format(addMonths(new Date(loanDate), months), 'yyyy-MM-dd'));
+    const base = safeDate(loanDate);
+    if (base) setDueDate(format(addMonths(base, months), 'yyyy-MM-dd'));
   }, [loanDate]);
 
   // When loan date changes → recalculate due date from tenure
   const handleLoanDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newLoanDate = e.target.value;
     setLoanDate(newLoanDate);
-    setDueDate(format(addMonths(new Date(newLoanDate), durationMonths), 'yyyy-MM-dd'));
+    const base = safeDate(newLoanDate);
+    if (base) setDueDate(format(addMonths(base, durationMonths), 'yyyy-MM-dd'));
   };
 
   // When due date changes → recalculate tenure from dates
   const handleDueDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newDueDate = e.target.value;
     setDueDate(newDueDate);
-    const months = Math.max(1, differenceInCalendarMonths(new Date(newDueDate), new Date(loanDate)));
-    setDurationMonths(Math.min(36, months));
+    const d = safeDate(newDueDate);
+    const l = safeDate(loanDate);
+    if (d && l) {
+      const months = Math.max(1, differenceInCalendarMonths(d, l));
+      setDurationMonths(Math.min(36, months));
+    }
   };
 
   // Generate schedule preview with customisable dates
+  const loanDateParsed = safeDate(loanDate) ?? new Date();
   const schedulePreview = (() => {
     if (paymentFrequency === 'semi_monthly') {
       const entries: { index: number; date: string; amount: number }[] = [];
       const perPayment = totalAmount / (durationMonths * 2);
       for (let i = 0; i < durationMonths; i++) {
-        const monthDate = addMonths(new Date(loanDate), i + 1);
+        const monthDate = addMonths(loanDateParsed, i + 1);
         const midIdx = entries.length;
         const lastIdx = midIdx + 1;
         entries.push({ index: midIdx, date: customScheduleDates[midIdx] ?? format(setDate(monthDate, 15), 'yyyy-MM-dd'), amount: perPayment });
@@ -105,7 +112,7 @@ export default function NewLoanPage() {
     }
     return Array.from({ length: durationMonths }, (_, i) => ({
       index: i,
-      date: customScheduleDates[i] ?? format(addMonths(new Date(loanDate), i + 1), 'yyyy-MM-dd'),
+      date: customScheduleDates[i] ?? format(addMonths(loanDateParsed, i + 1), 'yyyy-MM-dd'),
       amount: monthlyPayment,
     }));
   })();

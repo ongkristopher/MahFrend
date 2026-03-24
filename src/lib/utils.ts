@@ -52,3 +52,23 @@ export function formatCurrencyInput(value: string): string {
 
   return formattedInt + decPart;
 }
+
+/**
+ * Safely parse a date string. Returns null if invalid.
+ */
+export function safeDate(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+/**
+ * Safely create a Date from a string, falling back to current date if invalid.
+ * Use this as a drop-in replacement for `new Date(value)` inside format() calls.
+ */
+export function toDate(value: string | null | undefined): Date {
+  if (!value) return new Date(0);
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? new Date(0) : d;
+}
+

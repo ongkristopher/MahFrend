@@ -3,9 +3,10 @@
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Pencil } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { format, isBefore } from 'date-fns';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, toDate } from '@/lib/utils';
 import type { LoanEntry, PaymentSchedule } from '@/types/database';
 
 interface PaymentRow {
@@ -121,6 +122,14 @@ export default function LoanDetailPage() {
               {loan.status}
             </span>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.push(`/loans/${id}/edit`)}
+            className="text-muted-foreground hover:text-on-surface"
+          >
+            <Pencil size={16} />
+          </Button>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
@@ -142,7 +151,7 @@ export default function LoanDetailPage() {
           </div>
           <div>
             <p className="text-label-sm text-muted-foreground">Due Date</p>
-            <p className="text-headline-sm text-on-surface">{format(new Date(loan.due_date), 'MMM d, yyyy')}</p>
+            <p className="text-headline-sm text-on-surface">{format(toDate(loan.due_date), 'MMM d, yyyy')}</p>
           </div>
           <div>
             <p className="text-label-sm text-muted-foreground">Loan Duration</p>
@@ -201,7 +210,7 @@ export default function LoanDetailPage() {
           <div className="space-y-1">
             {schedules.map((schedule, i) => {
               const penalty = getPenalty(schedule);
-              const isOverdue = schedule.status === 'pending' && isBefore(new Date(schedule.due_date), new Date());
+              const isOverdue = schedule.status === 'pending' && isBefore(toDate(schedule.due_date), new Date());
               return (
                 <div
                   key={schedule.id}
@@ -211,7 +220,7 @@ export default function LoanDetailPage() {
                     <span className="text-xs text-muted-foreground w-6">#{i + 1}</span>
                     <div>
                       <span className="text-sm text-on-surface">
-                        {format(new Date(schedule.due_date), 'MMM d, yyyy')}
+                        {format(toDate(schedule.due_date), 'MMM d, yyyy')}
                       </span>
                       {penalty > 0 && (
                         <p className="text-[10px] text-status-overdue">
@@ -272,7 +281,7 @@ export default function LoanDetailPage() {
                   {formatCurrency(payment.amount, { sign: true })}
                 </p>
                 <p className="text-xs text-muted-foreground text-right">
-                  {format(new Date(payment.payment_date), 'MMM d, yyyy')}
+                  {format(toDate(payment.payment_date), 'MMM d, yyyy')}
                 </p>
                 <p className="text-xs text-muted-foreground text-right truncate">
                   {payment.notes || '—'}

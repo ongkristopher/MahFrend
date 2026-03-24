@@ -8,7 +8,7 @@ import {
   ChevronLeft, ChevronRight, Clock, CheckCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, toDate } from '@/lib/utils';
 import {
   format,
   startOfMonth,
@@ -129,7 +129,7 @@ export default function DashboardPage() {
       // This month's pending schedules
       const now = new Date();
       const monthPending = schedules.filter(s =>
-        s.status === 'pending' && isSameMonth(new Date(s.due_date), now)
+        s.status === 'pending' && isSameMonth(toDate(s.due_date), now)
       );
       setMonthSchedules(monthPending);
 
@@ -147,7 +147,7 @@ export default function DashboardPage() {
   const calDays = eachDayOfInterval({ start: calStart, end: calEnd });
 
   const getSchedulesForDate = (date: Date) =>
-    allSchedules.filter(s => isSameDay(new Date(s.due_date), date));
+    allSchedules.filter(s => isSameDay(toDate(s.due_date), date));
 
   const selectedDateSchedules = selectedDate ? getSchedulesForDate(selectedDate) : [];
 
@@ -318,8 +318,8 @@ export default function DashboardPage() {
                         {daySchedules.slice(0, 3).map((s) => {
                           const overdue =
                             s.status === "pending" &&
-                            isBefore(new Date(s.due_date), new Date()) &&
-                            !isSameDay(new Date(s.due_date), new Date());
+                            isBefore(toDate(s.due_date), new Date()) &&
+                            !isSameDay(toDate(s.due_date), new Date());
                           return (
                             <div
                               key={s.id}
@@ -453,7 +453,7 @@ export default function DashboardPage() {
                         </p>
                       </div>
                       <p className="text-xs text-muted-foreground shrink-0">
-                        {format(new Date(loan.due_date), "MMM d")}
+                        {format(toDate(loan.due_date), "MMM d")}
                       </p>
                     </button>
                   );
@@ -495,8 +495,8 @@ export default function DashboardPage() {
                       ?.full_name ?? "Unknown";
                   const penalty = Number(s.penalty_amount) || 0;
                   const isOverdue =
-                    isBefore(new Date(s.due_date), new Date()) &&
-                    !isSameDay(new Date(s.due_date), new Date());
+                    isBefore(toDate(s.due_date), new Date()) &&
+                    !isSameDay(toDate(s.due_date), new Date());
                   return (
                     <button
                       key={s.id}
@@ -520,7 +520,7 @@ export default function DashboardPage() {
                             {borrowerName}
                           </p>
                           <p className="text-[10px] text-muted-foreground">
-                            Due {format(new Date(s.due_date), "MMM d")}
+                            Due {format(toDate(s.due_date), "MMM d")}
                             {isOverdue && " · overdue"}
                           </p>
                         </div>
