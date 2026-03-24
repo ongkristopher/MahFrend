@@ -140,7 +140,7 @@ export default function LoanDetailPage() {
             <p className="text-headline-sm text-on-surface">{format(new Date(loan.due_date), 'MMM d, yyyy')}</p>
           </div>
           <div>
-            <p className="text-label-sm text-muted-foreground">Tenure</p>
+            <p className="text-label-sm text-muted-foreground">Loan Duration</p>
             <p className="text-headline-sm text-on-surface">{loan.duration_months ?? '—'} months</p>
           </div>
         </div>

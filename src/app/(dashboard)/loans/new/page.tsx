@@ -194,7 +194,7 @@ export default function NewLoanPage() {
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <Label className="text-label-md text-muted-foreground">Loan Tenure</Label>
+            <Label className="text-label-md text-muted-foreground">Loan Duration</Label>
             <span className="text-headline-sm text-on-surface font-medium">
               {durationMonths} {durationMonths === 1 ? 'month' : 'months'}
             </span>
