@@ -12,7 +12,7 @@ export default function DashboardLayout({
       <Header />
       <div className="flex flex-1">
         <Sidebar />
-        <main className="flex-1 pb-20 lg:pb-6 px-4 lg:px-8 py-6 max-w-5xl">
+        <main className="flex-1 pb-20 lg:pb-6 px-4 lg:px-8 py-6">
           {children}
         </main>
       </div>

@@ -28,6 +28,7 @@ export default function UsersPage() {
   const [formNotes, setFormNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [loanCounts, setLoanCounts] = useState<Record<string, { count: number; hasOverdue: boolean }>>({});
+  const [payorScores, setPayorScores] = useState<Record<string, { score: number; hasPaidSchedules: boolean }>>({});
   const router = useRouter();
   const supabase = createClient();
 
@@ -62,6 +63,43 @@ export default function UsersPage() {
           }
         });
         setLoanCounts(counts);
+      }
+
+      // Fetch payment schedules for payor score calculation
+      const { data: schedules } = await supabase
+        .from('payment_schedules')
+        .select('borrower_id, status, paid_at, due_date')
+        .eq('lender_id', user.id);
+
+      if (schedules) {
+        const scores: Record<string, { score: number; hasPaidSchedules: boolean }> = {};
+        const grouped: Record<string, typeof schedules> = {};
+
+        schedules.forEach((s) => {
+          if (!grouped[s.borrower_id]) grouped[s.borrower_id] = [];
+          grouped[s.borrower_id].push(s);
+        });
+
+        Object.entries(grouped).forEach(([borrowerId, borrowerSchedules]) => {
+          const paidSchedules = borrowerSchedules.filter((s) => s.status === 'paid');
+          if (paidSchedules.length === 0) {
+            scores[borrowerId] = { score: 0, hasPaidSchedules: false };
+            return;
+          }
+
+          const onTimeCount = paidSchedules.filter((s) => {
+            // If paid_at is null, consider it on-time for backward compatibility
+            if (!s.paid_at) return true;
+            return new Date(s.paid_at) <= new Date(s.due_date);
+          }).length;
+
+          scores[borrowerId] = {
+            score: onTimeCount / paidSchedules.length,
+            hasPaidSchedules: true,
+          };
+        });
+
+        setPayorScores(scores);
       }
     }
     setLoading(false);
@@ -134,6 +172,21 @@ export default function UsersPage() {
       b.email?.toLowerCase().includes(search.toLowerCase()) ||
       ''
   );
+
+  const getPayorBadge = (borrowerId: string) => {
+    const info = payorScores[borrowerId];
+    if (!info) return null;
+    if (!info.hasPaidSchedules) {
+      return { text: 'New', bgColor: 'bg-gray-500/15', textColor: 'text-muted-foreground' };
+    }
+    if (info.score >= 0.8) {
+      return { text: 'Good Payor', bgColor: 'bg-green-500/15', textColor: 'text-green-500' };
+    }
+    if (info.score >= 0.5) {
+      return { text: 'Fair', bgColor: 'bg-orange-500/15', textColor: 'text-orange-500' };
+    }
+    return { text: 'Needs Attention', bgColor: 'bg-red-500/15', textColor: 'text-red-500' };
+  };
 
   const getStatusLabel = (borrower: Borrower) => {
     const loanInfo = loanCounts[borrower.id];
@@ -260,6 +313,7 @@ export default function UsersPage() {
           <div className="space-y-2">
             {filtered.map((borrower) => {
               const status = getStatusLabel(borrower);
+              const payorBadge = getPayorBadge(borrower.id);
               return (
                 <button
                   key={borrower.id}
@@ -267,9 +321,16 @@ export default function UsersPage() {
                   className="w-full bg-surface-lowest rounded-md p-4 flex items-center justify-between text-left hover:bg-surface-low/50 transition-colors"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-on-surface truncate">
-                      {borrower.full_name}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-on-surface truncate">
+                        {borrower.full_name}
+                      </p>
+                      {payorBadge && (
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${payorBadge.bgColor} ${payorBadge.textColor} shrink-0`}>
+                          {payorBadge.text}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground truncate">
                       {borrower.email || borrower.phone || 'No contact info'}
                     </p>

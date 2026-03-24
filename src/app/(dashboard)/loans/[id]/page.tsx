@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isBefore } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
 import type { LoanEntry, PaymentSchedule } from '@/types/database';
 
@@ -95,6 +95,11 @@ export default function LoanDetailPage() {
   const interest = total - principal;
   const progress = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
   const paidSchedules = schedules.filter((s) => s.status === 'paid').length;
+  const graceDays = Number(loan.grace_period_days) || 0;
+  const penaltyRate = Number(loan.penalty_rate) || 0;
+
+  // Read penalty_amount from DB (computed by backend pg_cron function)
+  const getPenalty = (schedule: PaymentSchedule) => Number(schedule.penalty_amount) || 0;
 
   return (
     <div className="space-y-6">
@@ -152,6 +157,18 @@ export default function LoanDetailPage() {
           </div>
         )}
 
+        {graceDays > 0 && (
+          <div className="pt-2 border-t border-surface-low">
+            <p className="text-label-sm text-muted-foreground">Late Payment Rules</p>
+            <p className="text-body-md text-on-surface mt-1">
+              {graceDays}-day grace period
+              {penaltyRate > 0 && (
+                <> · {loan.penalty_type === 'percentage' ? `${penaltyRate}%` : formatCurrency(penaltyRate)} penalty ({loan.penalty_frequency === 'daily' ? 'per day' : loan.penalty_frequency === 'monthly' ? 'per month' : 'one-time'})</>
+              )}
+            </p>
+          </div>
+        )}
+
         {/* Progress bar */}
         <div className="space-y-1 pt-2">
           <div className="flex justify-between text-xs text-muted-foreground">
@@ -182,29 +199,51 @@ export default function LoanDetailPage() {
           </div>
         ) : (
           <div className="space-y-1">
-            {schedules.map((schedule, i) => (
-              <div
-                key={schedule.id}
-                className="bg-surface-lowest rounded-md px-4 py-3 flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-muted-foreground w-6">#{i + 1}</span>
-                  <span className="text-sm text-on-surface">
-                    {format(new Date(schedule.due_date), 'MMM d, yyyy')}
-                  </span>
+            {schedules.map((schedule, i) => {
+              const penalty = getPenalty(schedule);
+              const isOverdue = schedule.status === 'pending' && isBefore(new Date(schedule.due_date), new Date());
+              return (
+                <div
+                  key={schedule.id}
+                  className="bg-surface-lowest rounded-md px-4 py-3 flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-muted-foreground w-6">#{i + 1}</span>
+                    <div>
+                      <span className="text-sm text-on-surface">
+                        {format(new Date(schedule.due_date), 'MMM d, yyyy')}
+                      </span>
+                      {penalty > 0 && (
+                        <p className="text-[10px] text-status-overdue">
+                          +{formatCurrency(penalty)} penalty
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <span className="text-sm font-medium text-on-surface">
+                        {formatCurrency(schedule.amount)}
+                      </span>
+                      {penalty > 0 && (
+                        <p className="text-[10px] font-medium text-status-overdue">
+                          {formatCurrency(Number(schedule.amount) + penalty)}
+                        </p>
+                      )}
+                    </div>
+                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full capitalize ${
+                      schedule.status === 'paid'
+                        ? 'text-muted-foreground bg-muted-foreground/10'
+                        : isOverdue
+                          ? 'text-status-overdue bg-status-overdue/10'
+                          : 'text-status-ontime bg-status-ontime/10'
+                    }`}>
+                      {schedule.status === 'paid' ? 'paid' : isOverdue ? 'overdue' : 'pending'}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-on-surface">
-                    {formatCurrency(schedule.amount)}
-                  </span>
-                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full capitalize ${
-                    schedule.status === 'paid' ? 'text-muted-foreground bg-muted-foreground/10' : 'text-status-ontime bg-status-ontime/10'
-                  }`}>
-                    {schedule.status}
-                  </span>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

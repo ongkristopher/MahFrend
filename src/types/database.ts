@@ -40,6 +40,11 @@ export interface LoanEntry {
   status: 'active' | 'paid' | 'overdue' | 'defaulted';
   due_date: string;
   notes: string | null;
+  payment_frequency: 'monthly' | 'semi_monthly';
+  grace_period_days: number;
+  penalty_type: 'percentage' | 'fixed_amount' | null;
+  penalty_rate: number;
+  penalty_frequency: 'daily' | 'monthly' | 'one_time' | null;
   created_at: string;
   updated_at: string;
   // Joined
@@ -66,6 +71,8 @@ export interface PaymentSchedule {
   due_date: string;
   amount: number;
   status: 'pending' | 'paid';
+  paid_at: string | null;
+  penalty_amount: number;
   created_at: string;
   // Joined
   loan?: LoanEntry;
@@ -76,7 +83,7 @@ export interface DashboardStats {
   active_borrowers: number;
   total_lent: number;
   available_to_lend: number;
-  profit_or_loss: number;
+  total_interest_earned: number;
 }
 
 export interface CalendarEvent {

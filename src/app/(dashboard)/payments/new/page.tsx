@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { format } from 'date-fns';
+import { format, isBefore } from 'date-fns';
 import { formatCurrency } from '@/lib/utils';
 import type { Borrower, LoanEntry, PaymentSchedule } from '@/types/database';
 
@@ -44,7 +44,6 @@ function NewPaymentForm() {
   const searchParams = useSearchParams();
   const supabase = createClient();
 
-  // Pre-fill from URL query params
   const paramBorrower = searchParams.get('borrower');
   const paramLoan = searchParams.get('loan');
 
@@ -62,7 +61,6 @@ function NewPaymentForm() {
 
       if (data) {
         setBorrowers(data);
-        // Pre-fill borrower from URL
         if (paramBorrower && !prefilled && data.some(b => b.id === paramBorrower)) {
           setSelectedBorrower(paramBorrower);
         }
@@ -95,7 +93,6 @@ function NewPaymentForm() {
 
       if (data) {
         setLoans(data);
-        // Pre-fill loan from URL
         if (paramLoan && !prefilled && data.some(l => l.id === paramLoan)) {
           setSelectedLoan(paramLoan);
           setPrefilled(true);
@@ -106,7 +103,6 @@ function NewPaymentForm() {
     fetchLoans();
   }, [selectedBorrower, supabase, paramLoan, prefilled]);
 
-  // Fetch payment schedules when loan is selected
   useEffect(() => {
     const fetchSchedules = async () => {
       if (!selectedLoan) {
@@ -132,6 +128,11 @@ function NewPaymentForm() {
   }, [selectedLoan, supabase]);
 
   const pendingSchedules = schedules.filter(s => s.status === 'pending');
+  const selectedLoanData = loans.find((l) => l.id === selectedLoan);
+
+  // Read penalty_amount directly from DB — no frontend computation
+  const getPenalty = (schedule: PaymentSchedule) => Number(schedule.penalty_amount) || 0;
+  const totalPenalty = pendingSchedules.reduce((sum, s) => sum + getPenalty(s), 0);
 
   const toggleSchedule = useCallback((scheduleId: string) => {
     setSelectedSchedules(prev => {
@@ -145,17 +146,16 @@ function NewPaymentForm() {
     });
   }, []);
 
-  // Auto-fill amount when schedules are selected
+  // Auto-fill amount when schedules are selected (includes DB penalties)
   useEffect(() => {
     if (selectedSchedules.size > 0) {
       const total = schedules
         .filter(s => selectedSchedules.has(s.id))
-        .reduce((sum, s) => sum + Number(s.amount), 0);
-      setAmount(total.toString());
+        .reduce((sum, s) => sum + Number(s.amount) + getPenalty(s), 0);
+      setAmount(total.toFixed(2));
     }
   }, [selectedSchedules, schedules]);
 
-  const selectedLoanData = loans.find((l) => l.id === selectedLoan);
   const remaining = selectedLoanData
     ? Number(selectedLoanData.total_amount) - Number(selectedLoanData.amount_paid)
     : 0;
@@ -181,17 +181,42 @@ function NewPaymentForm() {
     });
 
     if (!error) {
-      // Mark selected schedules as paid
+      let penaltyPaid = 0;
+
       if (selectedSchedules.size > 0) {
-        const scheduleIds = Array.from(selectedSchedules);
-        await supabase
-          .from('payment_schedules')
-          .update({ status: 'paid' })
-          .in('id', scheduleIds);
+        const sortedSelected = schedules
+          .filter(s => selectedSchedules.has(s.id))
+          .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+
+        let remainingPayment = payAmount;
+        const schedulesToMarkPaid: string[] = [];
+
+        for (const schedule of sortedSelected) {
+          const penalty = getPenalty(schedule);
+          const totalDue = Number(schedule.amount) + penalty;
+
+          if (remainingPayment >= totalDue) {
+            schedulesToMarkPaid.push(schedule.id);
+            penaltyPaid += penalty;
+            remainingPayment -= totalDue;
+          } else {
+            const paidTowardPenalty = Math.max(0, remainingPayment - Number(schedule.amount));
+            penaltyPaid += paidTowardPenalty;
+            break;
+          }
+        }
+
+        if (schedulesToMarkPaid.length > 0) {
+          await supabase
+            .from('payment_schedules')
+            .update({ status: 'paid', paid_at: new Date().toISOString() })
+            .in('id', schedulesToMarkPaid);
+        }
       }
 
-      // Update loan amount_paid and status
-      const newAmountPaid = Number(selectedLoanData!.amount_paid) + payAmount;
+      // Only the non-penalty portion counts toward loan repayment
+      const principalPortion = payAmount - penaltyPaid;
+      const newAmountPaid = Number(selectedLoanData!.amount_paid) + principalPortion;
       const newStatus = newAmountPaid >= Number(selectedLoanData!.total_amount) ? 'paid' : selectedLoanData!.status;
 
       await supabase
@@ -275,9 +300,12 @@ function NewPaymentForm() {
               Select Months to Pay ({selectedSchedules.size} selected)
             </Label>
             <div className="space-y-1 max-h-48 overflow-y-auto">
-              {pendingSchedules.map((schedule, i) => {
+              {pendingSchedules.map((schedule) => {
                 const isChecked = selectedSchedules.has(schedule.id);
                 const scheduleIndex = schedules.findIndex(s => s.id === schedule.id);
+                const penalty = getPenalty(schedule);
+                const totalDue = Number(schedule.amount) + penalty;
+                const isOverdue = isBefore(new Date(schedule.due_date), new Date());
                 return (
                   <button
                     key={schedule.id}
@@ -299,24 +327,39 @@ function NewPaymentForm() {
                       </div>
                       <div className="text-left">
                         <span className="text-xs text-muted-foreground">#{scheduleIndex + 1}</span>
-                        <span className="text-sm text-on-surface ml-2">
+                        <span className={`text-sm ml-2 ${isOverdue ? 'text-status-overdue' : 'text-on-surface'}`}>
                           {format(new Date(schedule.due_date), 'MMM d, yyyy')}
                         </span>
+                        {isOverdue && (
+                          <span className="text-[10px] text-status-overdue ml-1">overdue</span>
+                        )}
                       </div>
                     </div>
-                    <span className="text-sm font-medium text-on-surface">
-                      {formatCurrency(schedule.amount)}
-                    </span>
+                    <div className="text-right">
+                      <span className="text-sm font-medium text-on-surface">
+                        {penalty > 0 ? formatCurrency(totalDue) : formatCurrency(schedule.amount)}
+                      </span>
+                      {penalty > 0 && (
+                        <p className="text-[10px] text-status-overdue">
+                          {formatCurrency(schedule.amount)} + {formatCurrency(penalty)} penalty
+                        </p>
+                      )}
+                    </div>
                   </button>
                 );
               })}
             </div>
+            {totalPenalty > 0 && (
+              <p className="text-label-sm text-status-overdue">
+                Total penalties: {formatCurrency(totalPenalty)}
+              </p>
+            )}
             {selectedSchedules.size > 0 && (
               <p className="text-label-sm text-muted-foreground">
                 Selected total: {formatCurrency(
                   schedules
                     .filter(s => selectedSchedules.has(s.id))
-                    .reduce((sum, s) => sum + Number(s.amount), 0)
+                    .reduce((sum, s) => sum + Number(s.amount) + getPenalty(s), 0)
                 )}
               </p>
             )}
@@ -375,7 +418,7 @@ function NewPaymentForm() {
       {selectedLoanData && parseFloat(amount) > 0 && (
         <div className="bg-inverse-surface rounded-md p-6 space-y-4">
           <h3 className="text-label-md text-on-primary/60">Summary Preview</h3>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-label-sm text-on-primary/40">Payment</p>
               <p className="text-headline-sm text-on-primary">
@@ -385,15 +428,29 @@ function NewPaymentForm() {
             <div>
               <p className="text-label-sm text-on-primary/40">New Balance</p>
               <p className="text-headline-sm text-on-primary">
-                {formatCurrency(Math.max(0, remaining - parseFloat(amount)))}
+                {formatCurrency(Math.max(0, remaining - (parseFloat(amount) - schedules
+                  .filter(s => selectedSchedules.has(s.id))
+                  .reduce((sum, s) => sum + getPenalty(s), 0))))}
               </p>
             </div>
             <div>
-              <p className="text-label-sm text-on-primary/40">Months Covered</p>
+              <p className="text-label-sm text-on-primary/40">Schedules Covered</p>
               <p className="text-headline-sm text-on-primary">
                 {selectedSchedules.size || '—'}
               </p>
             </div>
+            {totalPenalty > 0 && selectedSchedules.size > 0 && (
+              <div>
+                <p className="text-label-sm text-on-primary/40">Penalties Included</p>
+                <p className="text-headline-sm text-status-overdue">
+                  {formatCurrency(
+                    schedules
+                      .filter(s => selectedSchedules.has(s.id))
+                      .reduce((sum, s) => sum + getPenalty(s), 0)
+                  )}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
