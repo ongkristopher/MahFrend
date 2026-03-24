@@ -1,11 +1,12 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { Suspense, useEffect, useState, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { ArrowLeft, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -15,20 +16,37 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { format } from 'date-fns';
-import type { Borrower, LoanEntry } from '@/types/database';
+import { formatCurrency } from '@/lib/utils';
+import type { Borrower, LoanEntry, PaymentSchedule } from '@/types/database';
 
 export default function NewPaymentPage() {
+  return (
+    <Suspense>
+      <NewPaymentForm />
+    </Suspense>
+  );
+}
+
+function NewPaymentForm() {
   const [borrowers, setBorrowers] = useState<Borrower[]>([]);
   const [selectedBorrower, setSelectedBorrower] = useState('');
   const [loans, setLoans] = useState<LoanEntry[]>([]);
   const [selectedLoan, setSelectedLoan] = useState('');
+  const [schedules, setSchedules] = useState<PaymentSchedule[]>([]);
+  const [selectedSchedules, setSelectedSchedules] = useState<Set<string>>(new Set());
   const [amount, setAmount] = useState('');
   const [paymentDate, setPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [prefilled, setPrefilled] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const supabase = createClient();
+
+  // Pre-fill from URL query params
+  const paramBorrower = searchParams.get('borrower');
+  const paramLoan = searchParams.get('loan');
 
   useEffect(() => {
     const fetchBorrowers = async () => {
@@ -42,17 +60,25 @@ export default function NewPaymentPage() {
         .eq('status', 'active')
         .order('full_name');
 
-      if (data) setBorrowers(data);
+      if (data) {
+        setBorrowers(data);
+        // Pre-fill borrower from URL
+        if (paramBorrower && !prefilled && data.some(b => b.id === paramBorrower)) {
+          setSelectedBorrower(paramBorrower);
+        }
+      }
     };
 
     fetchBorrowers();
-  }, [supabase]);
+  }, [supabase, paramBorrower, prefilled]);
 
   useEffect(() => {
     const fetchLoans = async () => {
       if (!selectedBorrower) {
         setLoans([]);
         setSelectedLoan('');
+        setSchedules([]);
+        setSelectedSchedules(new Set());
         return;
       }
 
@@ -67,11 +93,67 @@ export default function NewPaymentPage() {
         .in('status', ['active', 'overdue'])
         .order('created_at', { ascending: false });
 
-      if (data) setLoans(data);
+      if (data) {
+        setLoans(data);
+        // Pre-fill loan from URL
+        if (paramLoan && !prefilled && data.some(l => l.id === paramLoan)) {
+          setSelectedLoan(paramLoan);
+          setPrefilled(true);
+        }
+      }
     };
 
     fetchLoans();
-  }, [selectedBorrower, supabase]);
+  }, [selectedBorrower, supabase, paramLoan, prefilled]);
+
+  // Fetch payment schedules when loan is selected
+  useEffect(() => {
+    const fetchSchedules = async () => {
+      if (!selectedLoan) {
+        setSchedules([]);
+        setSelectedSchedules(new Set());
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from('payment_schedules')
+        .select('*')
+        .eq('loan_id', selectedLoan)
+        .eq('lender_id', user.id)
+        .order('due_date', { ascending: true });
+
+      if (data) setSchedules(data);
+    };
+
+    fetchSchedules();
+  }, [selectedLoan, supabase]);
+
+  const pendingSchedules = schedules.filter(s => s.status === 'pending');
+
+  const toggleSchedule = useCallback((scheduleId: string) => {
+    setSelectedSchedules(prev => {
+      const next = new Set(prev);
+      if (next.has(scheduleId)) {
+        next.delete(scheduleId);
+      } else {
+        next.add(scheduleId);
+      }
+      return next;
+    });
+  }, []);
+
+  // Auto-fill amount when schedules are selected
+  useEffect(() => {
+    if (selectedSchedules.size > 0) {
+      const total = schedules
+        .filter(s => selectedSchedules.has(s.id))
+        .reduce((sum, s) => sum + Number(s.amount), 0);
+      setAmount(total.toString());
+    }
+  }, [selectedSchedules, schedules]);
 
   const selectedLoanData = loans.find((l) => l.id === selectedLoan);
   const remaining = selectedLoanData
@@ -80,7 +162,7 @@ export default function NewPaymentPage() {
 
   const selectedBorrowerName = borrowers.find(b => b.id === selectedBorrower)?.full_name;
   const selectedLoanLabel = selectedLoanData
-    ? `₱${Number(selectedLoanData.total_amount).toLocaleString()} — Due ${format(new Date(selectedLoanData.due_date), 'MMM d, yyyy')}`
+    ? `${formatCurrency(selectedLoanData.total_amount)} — Due ${format(new Date(selectedLoanData.due_date), 'MMM d, yyyy')}`
     : undefined;
 
   const handleSubmit = async () => {
@@ -99,6 +181,16 @@ export default function NewPaymentPage() {
     });
 
     if (!error) {
+      // Mark selected schedules as paid
+      if (selectedSchedules.size > 0) {
+        const scheduleIds = Array.from(selectedSchedules);
+        await supabase
+          .from('payment_schedules')
+          .update({ status: 'paid' })
+          .in('id', scheduleIds);
+      }
+
+      // Update loan amount_paid and status
       const newAmountPaid = Number(selectedLoanData!.amount_paid) + payAmount;
       const newStatus = newAmountPaid >= Number(selectedLoanData!.total_amount) ? 'paid' : selectedLoanData!.status;
 
@@ -169,27 +261,79 @@ export default function NewPaymentPage() {
             <SelectContent className="bg-surface-lowest">
               {loans.map((l) => (
                 <SelectItem key={l.id} value={l.id}>
-                  ₱{Number(l.total_amount).toLocaleString()} — Due {format(new Date(l.due_date), 'MMM d, yyyy')}
+                  {formatCurrency(l.total_amount)} — Due {format(new Date(l.due_date), 'MMM d, yyyy')}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
         </div>
 
+        {/* Payment Schedule Selection */}
+        {selectedLoan && pendingSchedules.length > 0 && (
+          <div className="space-y-2">
+            <Label className="text-label-md text-muted-foreground">
+              Select Months to Pay ({selectedSchedules.size} selected)
+            </Label>
+            <div className="space-y-1 max-h-48 overflow-y-auto">
+              {pendingSchedules.map((schedule, i) => {
+                const isChecked = selectedSchedules.has(schedule.id);
+                const scheduleIndex = schedules.findIndex(s => s.id === schedule.id);
+                return (
+                  <button
+                    key={schedule.id}
+                    type="button"
+                    onClick={() => toggleSchedule(schedule.id)}
+                    className={`w-full rounded-md px-4 py-3 flex items-center justify-between transition-colors ${
+                      isChecked
+                        ? 'bg-primary/10 ring-1 ring-primary/30'
+                        : 'bg-surface-lowest hover:bg-surface-low/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                        isChecked
+                          ? 'bg-primary border-primary'
+                          : 'border-surface-high'
+                      }`}>
+                        {isChecked && <Check size={12} className="text-on-primary" />}
+                      </div>
+                      <div className="text-left">
+                        <span className="text-xs text-muted-foreground">#{scheduleIndex + 1}</span>
+                        <span className="text-sm text-on-surface ml-2">
+                          {format(new Date(schedule.due_date), 'MMM d, yyyy')}
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-sm font-medium text-on-surface">
+                      {formatCurrency(schedule.amount)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            {selectedSchedules.size > 0 && (
+              <p className="text-label-sm text-muted-foreground">
+                Selected total: {formatCurrency(
+                  schedules
+                    .filter(s => selectedSchedules.has(s.id))
+                    .reduce((sum, s) => sum + Number(s.amount), 0)
+                )}
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="space-y-2">
-          <Label className="text-label-md text-muted-foreground">Payment Amount (₱)</Label>
-          <Input
-            type="number"
+          <Label className="text-label-md text-muted-foreground">Payment Amount</Label>
+          <CurrencyInput
             value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            onValueChange={setAmount}
             className="h-12 bg-surface-lowest border-0 text-on-surface"
             placeholder="0.00"
-            min="0"
-            step="0.01"
           />
           {selectedLoanData && (
             <p className="text-label-sm text-muted-foreground">
-              Remaining balance: ₱{remaining.toLocaleString()}
+              Remaining balance: {formatCurrency(remaining)}
             </p>
           )}
         </div>
@@ -231,17 +375,23 @@ export default function NewPaymentPage() {
       {selectedLoanData && parseFloat(amount) > 0 && (
         <div className="bg-inverse-surface rounded-md p-6 space-y-4">
           <h3 className="text-label-md text-on-primary/60">Summary Preview</h3>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <p className="text-label-sm text-on-primary/40">Payment</p>
               <p className="text-headline-sm text-on-primary">
-                ₱{parseFloat(amount).toLocaleString()}
+                {formatCurrency(parseFloat(amount))}
               </p>
             </div>
             <div>
               <p className="text-label-sm text-on-primary/40">New Balance</p>
               <p className="text-headline-sm text-on-primary">
-                ₱{Math.max(0, remaining - parseFloat(amount)).toLocaleString()}
+                {formatCurrency(Math.max(0, remaining - parseFloat(amount)))}
+              </p>
+            </div>
+            <div>
+              <p className="text-label-sm text-on-primary/40">Months Covered</p>
+              <p className="text-headline-sm text-on-primary">
+                {selectedSchedules.size || '—'}
               </p>
             </div>
           </div>

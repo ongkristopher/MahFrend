@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
+import { formatCurrency } from '@/lib/utils';
 
 interface PaymentRow {
   id: string;
@@ -13,7 +14,7 @@ interface PaymentRow {
   payment_date: string;
   notes: string | null;
   created_at: string;
-  loan: { total_amount: number; borrower: { full_name: string }[] }[];
+  loan: { total_amount: number; borrower: { full_name: string } };
 }
 
 export default function PaymentsPage() {
@@ -79,7 +80,7 @@ export default function PaymentsPage() {
         ) : (
           <div className="space-y-1">
             {payments.map((payment) => {
-              const borrowerName = payment.loan?.[0]?.borrower?.[0]?.full_name ?? 'Unknown';
+              const borrowerName = payment.loan?.borrower?.full_name ?? 'Unknown';
               return (
                 <div
                   key={payment.id}
@@ -87,7 +88,7 @@ export default function PaymentsPage() {
                 >
                   <p className="text-sm font-medium text-on-surface truncate">{borrowerName}</p>
                   <p className="text-sm text-green-500 font-medium text-right">
-                    +₱{Number(payment.amount).toLocaleString()}
+                    {formatCurrency(payment.amount, { sign: true })}
                   </p>
                   <p className="text-xs text-muted-foreground text-right">
                     {format(new Date(payment.payment_date), 'MMM d, yyyy')}

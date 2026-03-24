@@ -94,6 +94,7 @@ create table public.loan_entries (
   amount_paid numeric(12,2) not null default 0,
   status text not null default 'active' check (status in ('active', 'paid', 'overdue', 'defaulted')),
   due_date date not null,
+  notes text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Users, DollarSign, Wallet, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { formatCurrency } from '@/lib/utils';
 import type { DashboardStats } from '@/types/database';
 
 export default function DashboardPage() {
@@ -115,14 +116,13 @@ export default function DashboardPage() {
     },
   ];
 
-  const formatValue = (value: number | string, format: string) => {
-    if (format === 'number') return value;
+  const formatValue = (value: number | string, fmt: string) => {
+    if (fmt === 'number') return value;
     const num = typeof value === 'string' ? parseFloat(value) : value;
-    if (format === 'currency_signed') {
-      const prefix = num >= 0 ? '+' : '';
-      return `${prefix}₱${Math.abs(num).toLocaleString('en-US', { minimumFractionDigits: 0 })}`;
+    if (fmt === 'currency_signed') {
+      return formatCurrency(num, { sign: true });
     }
-    return `₱${num.toLocaleString('en-US', { minimumFractionDigits: 0 })}`;
+    return formatCurrency(num);
   };
 
   return (

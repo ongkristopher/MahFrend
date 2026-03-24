@@ -1,11 +1,12 @@
 'use client';
 
 import { createClient } from '@/lib/supabase/client';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
+import { formatCurrency } from '@/lib/utils';
 import type { LoanEntry } from '@/types/database';
 
 export default function LoansPage() {
@@ -42,6 +43,25 @@ export default function LoansPage() {
     }
   };
 
+  const groupedLoans = useMemo(() => {
+    const groups: { name: string; loans: LoanEntry[] }[] = [];
+    const map = new Map<string, LoanEntry[]>();
+
+    for (const loan of loans) {
+      const name = (loan.borrower as unknown as { full_name: string })?.full_name ?? 'Unknown';
+      if (!map.has(name)) {
+        map.set(name, []);
+      }
+      map.get(name)!.push(loan);
+    }
+
+    for (const [name, items] of map) {
+      groups.push({ name, loans: items });
+    }
+
+    return groups;
+  }, [loans]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -59,84 +79,102 @@ export default function LoansPage() {
         </Button>
       </div>
 
-      {/* Table */}
-      <div className="space-y-1">
-        {/* Header row */}
-        <div className="grid grid-cols-[1fr_80px_80px_80px_70px] gap-2 px-4 py-2">
-          <span className="text-label-sm text-muted-foreground">Borrower</span>
-          <span className="text-label-sm text-muted-foreground text-right">Principal</span>
-          <span className="text-label-sm text-muted-foreground text-right">Total</span>
-          <span className="text-label-sm text-muted-foreground text-right">Due Date</span>
-          <span className="text-label-sm text-muted-foreground text-right">Status</span>
+      {loading ? (
+        <div className="space-y-2">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-surface-lowest rounded-md p-4 animate-pulse h-14" />
+          ))}
         </div>
+      ) : loans.length === 0 ? (
+        <div className="text-center py-12">
+          <p className="text-muted-foreground text-body-md">
+            No loan entries yet. Create your first loan to get started.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {groupedLoans.map((group) => {
+            const groupTotal = group.loans.reduce((s, l) => s + Number(l.total_amount), 0);
+            const groupPaid = group.loans.reduce((s, l) => s + Number(l.amount_paid), 0);
+            const groupRemaining = groupTotal - groupPaid;
 
-        {loading ? (
-          <div className="space-y-2">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="bg-surface-lowest rounded-md p-4 animate-pulse h-14" />
-            ))}
-          </div>
-        ) : loans.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground text-body-md">
-              No loan entries yet. Create your first loan to get started.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-1">
-            {loans.map((loan) => {
-              const borrowerName = (loan.borrower as unknown as { full_name: string })?.full_name ?? 'Unknown';
-              const paid = Number(loan.amount_paid);
-              const total = Number(loan.total_amount);
-              const principal = Number(loan.principal_amount);
-              const interest = total - principal;
-              const progress = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
-
-              return (
-                <button
-                  key={loan.id}
-                  onClick={() => router.push(`/loans/${loan.id}`)}
-                  className="w-full bg-surface-lowest rounded-md p-4 grid grid-cols-[1fr_80px_80px_80px_70px] gap-2 items-center text-left hover:bg-surface-low/50 transition-colors"
-                >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-on-surface truncate">{borrowerName}</p>
-                    <div className="mt-1 h-1 w-full bg-surface-low rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary rounded-full transition-all"
-                        style={{ width: `${progress}%` }}
-                      />
-                    </div>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      ₱{paid.toLocaleString()} / ₱{total.toLocaleString()} paid
-                      {interest > 0 && <span className="text-muted-foreground/60"> (₱{interest.toLocaleString()} interest)</span>}
-                    </p>
-                  </div>
-                  <p className="text-sm text-on-surface text-right">
-                    ₱{principal.toLocaleString()}
-                  </p>
-                  <p className="text-sm text-on-surface text-right">
-                    ₱{total.toLocaleString()}
-                  </p>
-                  <p className="text-xs text-muted-foreground text-right">
-                    {format(new Date(loan.due_date), 'MMM d, yyyy')}
-                  </p>
-                  <div className="flex justify-end">
-                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full capitalize ${statusStyle(loan.status)}`}>
-                      {loan.status}
+            return (
+              <div key={group.name} className="space-y-2">
+                {/* Group header */}
+                <div className="flex items-center justify-between px-1">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-headline-sm text-on-surface">{group.name}</h2>
+                    <span className="text-xs text-muted-foreground">
+                      {group.loans.length} {group.loans.length === 1 ? 'loan' : 'loans'}
                     </span>
                   </div>
-                </button>
-              );
-            })}
-          </div>
-        )}
+                  <p className="text-label-sm text-muted-foreground">
+                    {formatCurrency(groupRemaining)} remaining
+                  </p>
+                </div>
 
-        {loans.length > 0 && (
-          <p className="text-label-sm text-muted-foreground px-4 pt-2">
-            {loans.length} loan {loans.length === 1 ? 'entry' : 'entries'}
+                {/* Column headers */}
+                <div className="grid grid-cols-[1fr_80px_80px_70px] gap-2 px-4 py-1">
+                  <span className="text-label-sm text-muted-foreground">Details</span>
+                  <span className="text-label-sm text-muted-foreground text-right">Principal</span>
+                  <span className="text-label-sm text-muted-foreground text-right">Total</span>
+                  <span className="text-label-sm text-muted-foreground text-right">Status</span>
+                </div>
+
+                {/* Loan rows */}
+                <div className="space-y-1">
+                  {group.loans.map((loan) => {
+                    const paid = Number(loan.amount_paid);
+                    const total = Number(loan.total_amount);
+                    const principal = Number(loan.principal_amount);
+                    const interest = total - principal;
+                    const progress = total > 0 ? Math.min(100, (paid / total) * 100) : 0;
+
+                    return (
+                      <button
+                        key={loan.id}
+                        onClick={() => router.push(`/loans/${loan.id}`)}
+                        className="w-full bg-surface-lowest rounded-md p-4 grid grid-cols-[1fr_80px_80px_70px] gap-2 items-center text-left hover:bg-surface-low/50 transition-colors"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs text-muted-foreground">
+                            Due {format(new Date(loan.due_date), 'MMM d, yyyy')}
+                          </p>
+                          <div className="mt-1 h-1 w-full bg-surface-low rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-primary rounded-full transition-all"
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            {formatCurrency(paid)} / {formatCurrency(total)} paid
+                            {interest > 0 && <span className="text-muted-foreground/60"> ({formatCurrency(interest)} interest)</span>}
+                          </p>
+                        </div>
+                        <p className="text-sm text-on-surface text-right">
+                          {formatCurrency(principal)}
+                        </p>
+                        <p className="text-sm text-on-surface text-right">
+                          {formatCurrency(total)}
+                        </p>
+                        <div className="flex justify-end">
+                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full capitalize ${statusStyle(loan.status)}`}>
+                            {loan.status}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+
+          <p className="text-label-sm text-muted-foreground px-1">
+            {loans.length} loan {loans.length === 1 ? 'entry' : 'entries'} · {groupedLoans.length} {groupedLoans.length === 1 ? 'borrower' : 'borrowers'}
           </p>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

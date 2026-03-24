@@ -3,8 +3,9 @@
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { CurrencyInput } from '@/components/ui/currency-input';
+import { formatCurrency } from '@/lib/utils';
 
 export default function ConfigurationPage() {
   const [loanableAmount, setLoanableAmount] = useState('');
@@ -86,21 +87,15 @@ export default function ConfigurationPage() {
       <div className="bg-surface-lowest rounded-md p-6 space-y-6">
         <div className="space-y-2">
           <Label className="text-label-md text-muted-foreground">Total Loanable Amount</Label>
-          <div className="relative">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl text-on-surface font-semibold">₱</span>
-            <Input
-              type="number"
-              value={loanableAmount}
-              onChange={(e) => setLoanableAmount(e.target.value)}
-              className="h-16 bg-surface-high border-0 text-2xl font-semibold text-on-surface pl-10"
-              placeholder="0.00"
-              min="0"
-              step="0.01"
-            />
-          </div>
+          <CurrencyInput
+            value={loanableAmount}
+            onValueChange={setLoanableAmount}
+            className="h-16 bg-surface-high border-0 text-2xl font-semibold text-on-surface"
+            placeholder="0.00"
+          />
           {currentAmount > 0 && (
             <p className="text-label-sm text-muted-foreground">
-              Current cycle limit: ${currentAmount.toLocaleString()} maximum allowed
+              Current cycle limit: {formatCurrency(currentAmount)} maximum allowed
             </p>
           )}
         </div>

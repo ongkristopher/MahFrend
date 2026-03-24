@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatCurrency } from '@/lib/utils';
 import type { LoanEntry, PaymentSchedule } from '@/types/database';
 
 interface PaymentRow {
@@ -120,19 +121,19 @@ export default function LoanDetailPage() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <p className="text-label-sm text-muted-foreground">Principal</p>
-            <p className="text-headline-sm text-on-surface">₱{principal.toLocaleString()}</p>
+            <p className="text-headline-sm text-on-surface">{formatCurrency(principal)}</p>
           </div>
           <div>
             <p className="text-label-sm text-muted-foreground">Interest ({Number(loan.interest_rate)}%)</p>
-            <p className="text-headline-sm text-on-surface">₱{interest.toLocaleString()}</p>
+            <p className="text-headline-sm text-on-surface">{formatCurrency(interest)}</p>
           </div>
           <div>
             <p className="text-label-sm text-muted-foreground">Total Amount</p>
-            <p className="text-headline-sm text-on-surface">₱{total.toLocaleString()}</p>
+            <p className="text-headline-sm text-on-surface">{formatCurrency(total)}</p>
           </div>
           <div>
             <p className="text-label-sm text-muted-foreground">Remaining</p>
-            <p className="text-headline-sm text-on-surface">₱{remaining.toLocaleString()}</p>
+            <p className="text-headline-sm text-on-surface">{formatCurrency(remaining)}</p>
           </div>
           <div>
             <p className="text-label-sm text-muted-foreground">Due Date</p>
@@ -144,10 +145,17 @@ export default function LoanDetailPage() {
           </div>
         </div>
 
+        {loan.notes && (
+          <div className="pt-2 border-t border-surface-low">
+            <p className="text-label-sm text-muted-foreground">Notes</p>
+            <p className="text-body-md text-on-surface mt-1">{loan.notes}</p>
+          </div>
+        )}
+
         {/* Progress bar */}
         <div className="space-y-1 pt-2">
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>₱{paid.toLocaleString()} paid</span>
+            <span>{formatCurrency(paid)} paid</span>
             <span>{progress.toFixed(0)}%</span>
           </div>
           <div className="h-2 w-full bg-surface-low rounded-full overflow-hidden">
@@ -187,7 +195,7 @@ export default function LoanDetailPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-medium text-on-surface">
-                    ₱{Number(schedule.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {formatCurrency(schedule.amount)}
                   </span>
                   <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full capitalize ${
                     schedule.status === 'paid' ? 'text-muted-foreground bg-muted-foreground/10' : 'text-status-ontime bg-status-ontime/10'
@@ -222,7 +230,7 @@ export default function LoanDetailPage() {
                 className="bg-surface-lowest rounded-md p-4 grid grid-cols-[1fr_90px_1fr] gap-2 items-center"
               >
                 <p className="text-sm text-green-500 font-medium">
-                  +₱{Number(payment.amount).toLocaleString()}
+                  {formatCurrency(payment.amount, { sign: true })}
                 </p>
                 <p className="text-xs text-muted-foreground text-right">
                   {format(new Date(payment.payment_date), 'MMM d, yyyy')}

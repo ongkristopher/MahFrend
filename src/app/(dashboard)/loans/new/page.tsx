@@ -6,7 +6,9 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -15,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { addMonths, differenceInCalendarMonths, format } from 'date-fns';
+import { formatCurrency } from '@/lib/utils';
 import type { Borrower } from '@/types/database';
 
 export default function NewLoanPage() {
@@ -25,6 +28,7 @@ export default function NewLoanPage() {
   const [durationMonths, setDurationMonths] = useState(1);
   const [loanDate, setLoanDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [dueDate, setDueDate] = useState(format(addMonths(new Date(), 1), 'yyyy-MM-dd'));
+  const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const router = useRouter();
@@ -100,6 +104,7 @@ export default function NewLoanPage() {
         duration_months: durationMonths,
         total_amount: totalAmount,
         due_date: dueDate,
+        notes: notes || null,
       })
       .select('id')
       .single();
@@ -165,15 +170,12 @@ export default function NewLoanPage() {
         </div>
 
         <div className="space-y-2">
-          <Label className="text-label-md text-muted-foreground">Principal Amount (₱)</Label>
-          <Input
-            type="number"
+          <Label className="text-label-md text-muted-foreground">Principal Amount</Label>
+          <CurrencyInput
             value={principal}
-            onChange={(e) => setPrincipal(e.target.value)}
+            onValueChange={setPrincipal}
             className="h-12 bg-surface-lowest border-0 text-on-surface"
             placeholder="0.00"
-            min="0"
-            step="0.01"
           />
         </div>
 
@@ -260,6 +262,16 @@ export default function NewLoanPage() {
           </div>
         </div>
 
+        <div className="space-y-2">
+          <Label className="text-label-md text-muted-foreground">Notes (Optional)</Label>
+          <Textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="bg-surface-lowest border-0 text-on-surface min-h-20 resize-none"
+            placeholder="e.g. Purpose of loan, special terms, etc."
+          />
+        </div>
+
         <Button
           className="w-full h-12 btn-primary-gradient text-on-primary font-medium"
           onClick={handleSubmit}
@@ -281,19 +293,19 @@ export default function NewLoanPage() {
             <div>
               <p className="text-label-sm text-on-primary/40">Principal</p>
               <p className="text-headline-sm text-on-primary">
-                ₱{principalNum.toLocaleString()}
+                {formatCurrency(principalNum)}
               </p>
             </div>
             <div>
               <p className="text-label-sm text-on-primary/40">Interest</p>
               <p className="text-headline-sm text-on-primary">
-                ₱{interestAmount.toLocaleString()}
+                {formatCurrency(interestAmount)}
               </p>
             </div>
             <div>
               <p className="text-label-sm text-on-primary/40">Total</p>
               <p className="text-headline-sm text-on-primary">
-                ₱{totalAmount.toLocaleString()}
+                {formatCurrency(totalAmount)}
               </p>
             </div>
           </div>
@@ -306,7 +318,7 @@ export default function NewLoanPage() {
           <div className="flex items-center justify-between">
             <h3 className="text-label-md text-muted-foreground">Monthly Payment Schedule</h3>
             <span className="text-label-sm text-muted-foreground">
-              ₱{monthlyPayment.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}/mo
+              {formatCurrency(monthlyPayment)}/mo
             </span>
           </div>
           <div className="space-y-1 max-h-64 overflow-y-auto">
@@ -322,7 +334,7 @@ export default function NewLoanPage() {
                   </span>
                 </div>
                 <span className="text-sm font-medium text-on-surface">
-                  ₱{entry.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  {formatCurrency(entry.amount)}
                 </span>
               </div>
             ))}

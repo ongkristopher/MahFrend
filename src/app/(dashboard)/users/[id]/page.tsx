@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { format } from 'date-fns';
+import { formatCurrency } from '@/lib/utils';
 import type { Borrower, LoanEntry, PaymentSchedule } from '@/types/database';
 
 interface PaymentRow {
@@ -219,11 +220,11 @@ export default function UserDetailPage() {
         <div className="grid grid-cols-3 gap-4 pt-2">
           <div>
             <p className="text-label-sm text-muted-foreground">Total Lent</p>
-            <p className="text-headline-sm text-on-surface">₱{totalLent.toLocaleString()}</p>
+            <p className="text-headline-sm text-on-surface">{formatCurrency(totalLent)}</p>
           </div>
           <div>
             <p className="text-label-sm text-muted-foreground">Outstanding</p>
-            <p className="text-headline-sm text-on-surface">₱{totalOwed.toLocaleString()}</p>
+            <p className="text-headline-sm text-on-surface">{formatCurrency(totalOwed)}</p>
           </div>
           <div>
             <p className="text-label-sm text-muted-foreground">Loans</p>
@@ -315,14 +316,14 @@ export default function UserDetailPage() {
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="text-sm font-medium text-on-surface">
-                            ₱{Number(loan.principal_amount).toLocaleString()}
+                            {formatCurrency(loan.principal_amount)}
                           </p>
                           <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full capitalize ${statusStyle(loan.status)}`}>
                             {loan.status}
                           </span>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          Due {format(new Date(loan.due_date), 'MMM d, yyyy')} · ₱{Number(loan.amount_paid).toLocaleString()} / ₱{Number(loan.total_amount).toLocaleString()} paid
+                          Due {format(new Date(loan.due_date), 'MMM d, yyyy')} · {formatCurrency(loan.amount_paid)} / {formatCurrency(loan.total_amount)} paid
                         </p>
                       </div>
                     </div>
@@ -356,7 +357,7 @@ export default function UserDetailPage() {
                             </div>
                             <div className="flex items-center gap-2">
                               <span className="text-sm text-on-surface">
-                                ₱{Number(s.amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {formatCurrency(s.amount)}
                               </span>
                               <span className={`text-[10px] px-1.5 py-0.5 rounded capitalize ${
                                 s.status === 'paid' ? 'text-muted-foreground bg-muted-foreground/10' : 'text-status-ontime bg-status-ontime/10'
@@ -397,7 +398,7 @@ export default function UserDetailPage() {
                 className="bg-surface-lowest rounded-md p-4 grid grid-cols-[1fr_90px_1fr] gap-2 items-center"
               >
                 <p className="text-sm text-green-500 font-medium">
-                  +₱{Number(payment.amount).toLocaleString()}
+                  {formatCurrency(payment.amount, { sign: true })}
                 </p>
                 <p className="text-xs text-muted-foreground text-right">
                   {format(new Date(payment.payment_date), 'MMM d, yyyy')}

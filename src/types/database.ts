@@ -39,6 +39,7 @@ export interface LoanEntry {
   amount_paid: number;
   status: 'active' | 'paid' | 'overdue' | 'defaulted';
   due_date: string;
+  notes: string | null;
   created_at: string;
   updated_at: string;
   // Joined
