@@ -11,7 +11,20 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "MahFrend",
-  description: "Minimalist lending management for friends and family",
+  description: "Lending management for friends and family — built with heart.",
+  openGraph: {
+    images: [
+      {
+        url: "/opengraph-image.png",
+        width: 1200,
+        height: 630,
+        alt: "MahFrend - Lending management for friends and family — built with heart.",
+      },
+    ],
+  },
+  twitter: {
+    images: ["/opengraph-image.png"],
+  },
 };
 
 export default function RootLayout({
