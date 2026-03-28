@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Plus, MoreHorizontal, Pencil, Trash2, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { format } from 'date-fns';
@@ -28,7 +28,7 @@ interface PaymentRow {
   payment_date: string;
   notes: string | null;
   created_at: string;
-  loan: { id: string; total_amount: number; borrower: { full_name: string } };
+  loan: { id: string; total_amount: number; notes: string | null; borrower: { full_name: string } };
 }
 
 export default function PaymentsPage() {
@@ -40,6 +40,7 @@ export default function PaymentsPage() {
   const [editNotes, setEditNotes] = useState('');
   const [editOpen, setEditOpen] = useState(false);
   const [deleting, setDeleting] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const router = useRouter();
   const supabase = createClient();
 
@@ -49,7 +50,7 @@ export default function PaymentsPage() {
 
     const { data } = await supabase
       .from('payments')
-      .select('id, amount, payment_date, notes, created_at, loan:loan_entries(id, total_amount, borrower:borrowers(full_name))')
+      .select('id, amount, payment_date, notes, created_at, loan:loan_entries(id, total_amount, notes, borrower:borrowers(full_name))')
       .eq('lender_id', user.id)
       .order('created_at', { ascending: false });
 
@@ -64,7 +65,7 @@ export default function PaymentsPage() {
 
       const { data } = await supabase
         .from('payments')
-        .select('id, amount, payment_date, notes, created_at, loan:loan_entries(id, total_amount, borrower:borrowers(full_name))')
+        .select('id, amount, payment_date, notes, created_at, loan:loan_entries(id, total_amount, notes, borrower:borrowers(full_name))')
         .eq('lender_id', user.id)
         .order('created_at', { ascending: false });
 
@@ -186,14 +187,42 @@ export default function PaymentsPage() {
       if (toRevert.length > 0) {
         await supabase
           .from('payment_schedules')
-          .update({ status: 'pending', paid_at: null })
+          .update({ status: 'pending', paid_at: null, amount_paid: 0, penalty_paid: 0 })
           .in('id', toRevert);
+      }
+
+      // Also reset any partially-paid pending schedules for this loan
+      const { data: pendingWithPartial } = await supabase
+        .from('payment_schedules')
+        .select('id')
+        .eq('loan_id', loanId)
+        .eq('status', 'pending')
+        .gt('amount_paid', 0);
+
+      if (pendingWithPartial && pendingWithPartial.length > 0) {
+        await supabase
+          .from('payment_schedules')
+          .update({ amount_paid: 0, penalty_paid: 0 })
+          .in('id', pendingWithPartial.map(s => s.id));
       }
     }
 
     setDeleting('');
     fetchPayments();
   };
+
+  const filteredPayments = payments.filter((payment) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    const borrowerName = payment.loan?.borrower?.full_name ?? '';
+    const loanNotes = payment.loan?.notes ?? '';
+    const paymentNotes = payment.notes ?? '';
+    return (
+      borrowerName.toLowerCase().includes(q) ||
+      loanNotes.toLowerCase().includes(q) ||
+      paymentNotes.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="space-y-6">
@@ -212,6 +241,17 @@ export default function PaymentsPage() {
         </Button>
       </div>
 
+      {/* Search */}
+      <div className="relative">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="h-10 bg-surface-lowest border-0 text-on-surface pl-9"
+          placeholder="Search by borrower, loan notes, or payment notes..."
+        />
+      </div>
+
       {/* Table */}
       <div className="space-y-1">
         <div className="grid grid-cols-[1fr_90px_90px_1fr_36px] gap-2 px-4 py-2">
@@ -228,59 +268,70 @@ export default function PaymentsPage() {
               <div key={i} className="bg-surface-lowest rounded-md p-4 animate-pulse h-14" />
             ))}
           </div>
-        ) : payments.length === 0 ? (
+        ) : filteredPayments.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-muted-foreground text-body-md">No payments recorded yet.</p>
+            <p className="text-muted-foreground text-body-md">
+              {payments.length === 0 ? 'No payments recorded yet.' : 'No payments match your search.'}
+            </p>
           </div>
         ) : (
           <div className="space-y-1">
-            {payments.map((payment) => {
+            {filteredPayments.map((payment) => {
               const borrowerName = payment.loan?.borrower?.full_name ?? 'Unknown';
+              const loanNotes = payment.loan?.notes;
               return (
                 <div
                   key={payment.id}
-                  className="bg-surface-lowest rounded-md p-4 grid grid-cols-[1fr_90px_90px_1fr_36px] gap-2 items-center"
+                  className="bg-surface-lowest rounded-md p-4 space-y-1"
                 >
-                  <p className="text-sm font-medium text-on-surface truncate">{borrowerName}</p>
-                  <p className="text-sm text-green-500 font-medium text-right">
-                    {formatCurrency(payment.amount, { sign: true })}
-                  </p>
-                  <p className="text-xs text-muted-foreground text-right">
-                    {format(toDate(payment.payment_date), 'MMM d, yyyy')}
-                  </p>
-                  <p className="text-xs text-muted-foreground text-right truncate">
-                    {payment.notes || '—'}
-                  </p>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger
-                      className="p-1 rounded hover:bg-surface-low transition-colors"
-                    >
-                      <MoreHorizontal size={16} className="text-muted-foreground" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleEditOpen(payment)}>
-                        <Pencil size={14} className="mr-2" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-red-500 focus:text-red-500"
-                        onClick={() => handleDelete(payment)}
-                        disabled={deleting === payment.id}
+                  <div className="grid grid-cols-[1fr_90px_90px_1fr_36px] gap-2 items-center">
+                    <p className="text-sm font-medium text-on-surface truncate">{borrowerName}</p>
+                    <p className="text-sm text-green-500 font-medium text-right">
+                      {formatCurrency(payment.amount, { sign: true })}
+                    </p>
+                    <p className="text-xs text-muted-foreground text-right">
+                      {format(toDate(payment.payment_date), 'MMM d, yyyy')}
+                    </p>
+                    <p className="text-xs text-muted-foreground text-right truncate">
+                      {payment.notes || '—'}
+                    </p>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        className="p-1 rounded hover:bg-surface-low transition-colors"
                       >
-                        <Trash2 size={14} className="mr-2" />
-                        {deleting === payment.id ? 'Deleting...' : 'Delete'}
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                        <MoreHorizontal size={16} className="text-muted-foreground" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleEditOpen(payment)}>
+                          <Pencil size={14} className="mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-red-500 focus:text-red-500"
+                          onClick={() => handleDelete(payment)}
+                          disabled={deleting === payment.id}
+                        >
+                          <Trash2 size={14} className="mr-2" />
+                          {deleting === payment.id ? 'Deleting...' : 'Delete'}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  {loanNotes && (
+                    <p className="text-[10px] text-muted-foreground truncate">
+                      Loan: {loanNotes}
+                    </p>
+                  )}
                 </div>
               );
             })}
           </div>
         )}
 
-        {payments.length > 0 && (
+        {filteredPayments.length > 0 && (
           <p className="text-label-sm text-muted-foreground px-4 pt-2">
-            {payments.length} payment{payments.length === 1 ? '' : 's'}
+            {filteredPayments.length} payment{filteredPayments.length === 1 ? '' : 's'}
+            {searchQuery.trim() && payments.length !== filteredPayments.length && ` (of ${payments.length})`}
           </p>
         )}
       </div>

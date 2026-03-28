@@ -134,6 +134,10 @@ function NewPaymentForm() {
   const getPenalty = (schedule: PaymentSchedule) => Number(schedule.penalty_amount) || 0;
   const totalPenalty = pendingSchedules.reduce((sum, s) => sum + getPenalty(s), 0);
 
+  // Partial payment detection uses the amount_paid field on each schedule directly.
+  // Each schedule tracks how much has been paid toward it (0 = nothing, amount = fully paid).
+  const getAmountPaid = (schedule: PaymentSchedule) => Number(schedule.amount_paid) || 0;
+
   const toggleSchedule = useCallback((scheduleId: string) => {
     setSelectedSchedules(prev => {
       const next = new Set(prev);
@@ -146,12 +150,19 @@ function NewPaymentForm() {
     });
   }, []);
 
-  // Auto-fill amount when schedules are selected (includes DB penalties)
+  // Auto-fill amount when schedules are selected (includes DB penalties, accounts for partial payments)
   useEffect(() => {
     if (selectedSchedules.size > 0) {
-      const total = schedules
+      const total = pendingSchedules
         .filter(s => selectedSchedules.has(s.id))
-        .reduce((sum, s) => sum + Number(s.amount) + getPenalty(s), 0);
+        .reduce((sum, s) => {
+          const scheduleAmount = Number(s.amount);
+          const penalty = getPenalty(s);
+          const amountPaid = getAmountPaid(s);
+          const totalObligation = scheduleAmount + penalty;
+          const effectiveAmount = amountPaid > 0 ? Math.max(0, totalObligation - amountPaid) : totalObligation;
+          return sum + effectiveAmount;
+        }, 0);
       setAmount(total.toFixed(2));
     }
   }, [selectedSchedules, schedules]);
@@ -162,7 +173,7 @@ function NewPaymentForm() {
 
   const selectedBorrowerName = borrowers.find(b => b.id === selectedBorrower)?.full_name;
   const selectedLoanLabel = selectedLoanData
-    ? `${formatCurrency(selectedLoanData.total_amount)} — Due ${format(toDate(selectedLoanData.due_date), 'MMM d, yyyy')}`
+    ? `${formatCurrency(selectedLoanData.total_amount)} — Due ${format(toDate(selectedLoanData.due_date), 'MMM d, yyyy')}${selectedLoanData.notes ? ` · ${selectedLoanData.notes}` : ''}`
     : undefined;
 
   const handleSubmit = async () => {
@@ -189,28 +200,42 @@ function NewPaymentForm() {
           .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
 
         let remainingPayment = payAmount;
-        const schedulesToMarkPaid: string[] = [];
+        const schedulesToMarkPaid: { id: string; penaltyCollected: number }[] = [];
 
         for (const schedule of sortedSelected) {
           const penalty = getPenalty(schedule);
-          const totalDue = Number(schedule.amount) + penalty;
+          const alreadyPaid = getAmountPaid(schedule);
+          const scheduleRemaining = Number(schedule.amount) - alreadyPaid;
+          const totalDue = scheduleRemaining + penalty;
 
           if (remainingPayment >= totalDue) {
-            schedulesToMarkPaid.push(schedule.id);
+            schedulesToMarkPaid.push({ id: schedule.id, penaltyCollected: penalty });
             penaltyPaid += penalty;
             remainingPayment -= totalDue;
           } else {
-            const paidTowardPenalty = Math.max(0, remainingPayment - Number(schedule.amount));
+            // Partial payment — atomically increment amount_paid on this schedule
+            const paidTowardPrincipal = Math.min(remainingPayment, scheduleRemaining);
+            const paidTowardPenalty = Math.max(0, remainingPayment - scheduleRemaining);
             penaltyPaid += paidTowardPenalty;
+
+            await supabase.rpc('increment_schedule_payment', {
+              p_schedule_id: schedule.id,
+              p_amount_paid: Math.round(paidTowardPrincipal * 100) / 100,
+              p_penalty_paid: Math.round(paidTowardPenalty * 100) / 100,
+            });
+
+            remainingPayment = 0;
             break;
           }
         }
 
         if (schedulesToMarkPaid.length > 0) {
-          await supabase
-            .from('payment_schedules')
-            .update({ status: 'paid', paid_at: new Date().toISOString() })
-            .in('id', schedulesToMarkPaid);
+          for (const item of schedulesToMarkPaid) {
+            await supabase.rpc('mark_schedule_paid', {
+              p_schedule_id: item.id,
+              p_penalty_collected: Math.round(item.penaltyCollected * 100) / 100,
+            });
+          }
         }
       }
 
@@ -286,7 +311,7 @@ function NewPaymentForm() {
             <SelectContent className="bg-surface-lowest">
               {loans.map((l) => (
                 <SelectItem key={l.id} value={l.id}>
-                  {formatCurrency(l.total_amount)} — Due {format(toDate(l.due_date), 'MMM d, yyyy')}
+                  {formatCurrency(l.total_amount)} — Due {format(toDate(l.due_date), 'MMM d, yyyy')}{l.notes ? ` · ${l.notes}` : ''}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -304,7 +329,13 @@ function NewPaymentForm() {
                 const isChecked = selectedSchedules.has(schedule.id);
                 const scheduleIndex = schedules.findIndex(s => s.id === schedule.id);
                 const penalty = getPenalty(schedule);
-                const totalDue = Number(schedule.amount) + penalty;
+                const scheduleAmount = Number(schedule.amount);
+                const amountPaid = getAmountPaid(schedule);
+                const totalObligation = scheduleAmount + penalty;
+                const hasPartial = amountPaid > 0 && amountPaid < totalObligation;
+                const remainingAmount = hasPartial ? Math.max(0, scheduleAmount - amountPaid) : scheduleAmount;
+                const remainingPenalty = hasPartial && amountPaid > scheduleAmount ? Math.max(0, penalty - (amountPaid - scheduleAmount)) : penalty;
+                const totalDue = hasPartial ? Math.max(0, totalObligation - amountPaid) : remainingAmount + penalty;
                 const isOverdue = isBefore(toDate(schedule.due_date), new Date());
                 return (
                   <button
@@ -336,13 +367,31 @@ function NewPaymentForm() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <span className="text-sm font-medium text-on-surface">
-                        {penalty > 0 ? formatCurrency(totalDue) : formatCurrency(schedule.amount)}
-                      </span>
-                      {penalty > 0 && (
-                        <p className="text-[10px] text-status-overdue">
-                          {formatCurrency(schedule.amount)} + {formatCurrency(penalty)} penalty
-                        </p>
+                      {hasPartial ? (
+                        <>
+                          <span className="text-sm font-medium text-on-surface">
+                            {formatCurrency(totalDue)}
+                          </span>
+                          <p className="text-[10px] text-muted-foreground">
+                            {formatCurrency(totalDue)} remaining (was {formatCurrency(totalObligation)})
+                          </p>
+                          {remainingPenalty > 0 && (
+                            <p className="text-[10px] text-status-overdue">
+                              includes {formatCurrency(remainingPenalty)} penalty
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-sm font-medium text-on-surface">
+                            {penalty > 0 ? formatCurrency(totalDue) : formatCurrency(scheduleAmount)}
+                          </span>
+                          {penalty > 0 && (
+                            <p className="text-[10px] text-status-overdue">
+                              {formatCurrency(scheduleAmount)} + {formatCurrency(penalty)} penalty
+                            </p>
+                          )}
+                        </>
                       )}
                     </div>
                   </button>
@@ -357,9 +406,13 @@ function NewPaymentForm() {
             {selectedSchedules.size > 0 && (
               <p className="text-label-sm text-muted-foreground">
                 Selected total: {formatCurrency(
-                  schedules
+                  pendingSchedules
                     .filter(s => selectedSchedules.has(s.id))
-                    .reduce((sum, s) => sum + Number(s.amount) + getPenalty(s), 0)
+                    .reduce((sum, s) => {
+                      const paid = getAmountPaid(s);
+                      const totalObligation = Number(s.amount) + getPenalty(s);
+                      return sum + (paid > 0 ? Math.max(0, totalObligation - paid) : totalObligation);
+                    }, 0)
                 )}
               </p>
             )}

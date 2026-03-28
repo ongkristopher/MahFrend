@@ -135,9 +135,11 @@ create table public.payment_schedules (
   borrower_id uuid references public.borrowers(id) on delete cascade not null,
   due_date date not null,
   amount numeric(12,2) not null,
+  amount_paid numeric(12,2) not null default 0,
   status text not null default 'pending' check (status in ('pending', 'paid')),
   paid_at timestamptz,
   penalty_amount numeric(12,2) not null default 0,
+  penalty_paid numeric(12,2) not null default 0,
   created_at timestamptz not null default now()
 );
 

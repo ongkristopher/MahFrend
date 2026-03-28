@@ -3,11 +3,11 @@
 import { createClient } from '@/lib/supabase/client';
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ArrowLeft, Pencil, Check, X, RotateCcw, Trash2 } from 'lucide-react';
+import { ArrowLeft, Pencil, Check, X, RotateCcw, Trash2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { CurrencyInput } from '@/components/ui/currency-input';
-import { format, isBefore } from 'date-fns';
+import { addMonths, format, isBefore } from 'date-fns';
 import { formatCurrency, toDate } from '@/lib/utils';
 import type { LoanEntry, PaymentSchedule } from '@/types/database';
 
@@ -22,6 +22,7 @@ interface ScheduleEdit {
   id: string;
   due_date: string;
   amount: string; // raw string for CurrencyInput
+  isNew?: boolean; // true for newly added schedules
 }
 
 export default function LoanDetailPage() {
@@ -115,6 +116,9 @@ export default function LoanDetailPage() {
   const penaltyRate = Number(loan.penalty_rate) || 0;
 
   const getPenalty = (schedule: PaymentSchedule) => Number(schedule.penalty_amount) || 0;
+  const totalPenaltiesOutstanding = pendingSchedules.reduce((sum, s) => sum + getPenalty(s), 0);
+  const totalPenaltiesCollected = schedules.reduce((sum, s) => sum + (Number(s.penalty_paid) || 0), 0);
+  const totalPenalties = totalPenaltiesOutstanding + totalPenaltiesCollected;
 
   // Start editing: initialize edits from current pending schedules
   const startEditing = () => {
@@ -145,8 +149,27 @@ export default function LoanDetailPage() {
 
   const removeScheduleEdit = (index: number) => {
     const edit = scheduleEdits[index];
-    setSchedulesToDelete(prev => new Set(prev).add(edit.id));
+    if (!edit.isNew) {
+      setSchedulesToDelete(prev => new Set(prev).add(edit.id));
+    }
     setScheduleEdits(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const addScheduleEntry = () => {
+    const lastDate = scheduleEdits.length > 0
+      ? scheduleEdits[scheduleEdits.length - 1].due_date
+      : pendingSchedules.length > 0
+        ? pendingSchedules[pendingSchedules.length - 1].due_date
+        : loan.due_date;
+    const nextDate = lastDate
+      ? format(addMonths(toDate(lastDate), 1), 'yyyy-MM-dd')
+      : format(new Date(), 'yyyy-MM-dd');
+    setScheduleEdits(prev => [...prev, {
+      id: `new-${Date.now()}`,
+      due_date: nextDate,
+      amount: '0',
+      isNew: true,
+    }]);
   };
 
   // Redistribute remaining balance evenly across pending schedules
@@ -171,6 +194,9 @@ export default function LoanDetailPage() {
   const saveSchedules = async () => {
     setSaving(true);
 
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setSaving(false); return; }
+
     // Delete removed schedules
     if (schedulesToDelete.size > 0) {
       await supabase
@@ -179,8 +205,11 @@ export default function LoanDetailPage() {
         .in('id', Array.from(schedulesToDelete));
     }
 
-    // Update remaining schedules
-    for (const edit of scheduleEdits) {
+    const existingEdits = scheduleEdits.filter(e => !e.isNew);
+    const newEdits = scheduleEdits.filter(e => e.isNew);
+
+    // Update existing schedules
+    for (const edit of existingEdits) {
       await supabase
         .from('payment_schedules')
         .update({
@@ -188,6 +217,20 @@ export default function LoanDetailPage() {
           amount: Math.round(parseFloat(edit.amount) * 100) / 100,
         })
         .eq('id', edit.id);
+    }
+
+    // Insert new schedules
+    if (newEdits.length > 0) {
+      await supabase.from('payment_schedules').insert(
+        newEdits.map(edit => ({
+          loan_id: id,
+          lender_id: user.id,
+          borrower_id: loan.borrower_id,
+          due_date: edit.due_date,
+          amount: Math.round(parseFloat(edit.amount) * 100) / 100,
+          status: 'pending',
+        }))
+      );
     }
 
     // Update loan duration_months = total schedules (paid + remaining pending)
@@ -251,13 +294,31 @@ export default function LoanDetailPage() {
             <p className="text-label-sm text-muted-foreground">Remaining</p>
             <p className="text-headline-sm text-on-surface">{formatCurrency(remaining)}</p>
           </div>
+          {totalPenalties > 0 && (
+            <div>
+              <p className="text-label-sm text-muted-foreground">Penalties</p>
+              <p className="text-headline-sm text-status-overdue">{formatCurrency(totalPenalties)}</p>
+              {totalPenaltiesCollected > 0 && totalPenaltiesOutstanding > 0 && (
+                <p className="text-[10px] text-muted-foreground">
+                  {formatCurrency(totalPenaltiesCollected)} collected · {formatCurrency(totalPenaltiesOutstanding)} outstanding
+                </p>
+              )}
+            </div>
+          )}
           <div>
             <p className="text-label-sm text-muted-foreground">Due Date</p>
             <p className="text-headline-sm text-on-surface">{format(toDate(loan.due_date), 'MMM d, yyyy')}</p>
           </div>
           <div>
             <p className="text-label-sm text-muted-foreground">Loan Duration</p>
-            <p className="text-headline-sm text-on-surface">{loan.duration_months ?? '—'} months</p>
+            <p className="text-headline-sm text-on-surface">
+              {loan.duration_months ?? '—'} months
+              {loan.payment_frequency === 'semi_monthly' && loan.duration_months && (
+                <span className="text-label-sm text-muted-foreground font-normal ml-1">
+                  ({schedules.length} payments)
+                </span>
+              )}
+            </p>
           </div>
         </div>
 
@@ -338,15 +399,26 @@ export default function LoanDetailPage() {
                   </p>
                 )}
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={redistributeEvenly}
-                className="text-xs h-7 px-2"
-              >
-                <RotateCcw size={12} className="mr-1" />
-                Split evenly
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={addScheduleEntry}
+                  className="text-xs h-7 px-2"
+                >
+                  <Plus size={12} className="mr-1" />
+                  Add
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={redistributeEvenly}
+                  className="text-xs h-7 px-2"
+                >
+                  <RotateCcw size={12} className="mr-1" />
+                  Split evenly
+                </Button>
+              </div>
             </div>
             <div className="flex gap-2">
               <Button
@@ -458,6 +530,39 @@ export default function LoanDetailPage() {
                       {schedule.status === 'paid' ? 'paid' : isOverdue ? 'overdue' : 'pending'}
                     </span>
                   </div>
+                </div>
+              );
+            })}
+            {/* Newly added schedules (not yet in DB) */}
+            {editingSchedules && scheduleEdits.filter(e => e.isNew).map((edit) => {
+              const editIndex = scheduleEdits.findIndex(e => e.id === edit.id);
+              const displayIndex = schedules.length + scheduleEdits.filter(e => e.isNew).indexOf(edit);
+              return (
+                <div
+                  key={edit.id}
+                  className="bg-surface-lowest rounded-md px-4 py-3 flex items-center gap-2 ring-1 ring-status-ontime/20"
+                >
+                  <span className="text-xs text-status-ontime w-6">#{displayIndex + 1}</span>
+                  <Input
+                    type="date"
+                    value={edit.due_date}
+                    onChange={(e) => updateEdit(editIndex, 'due_date', e.target.value)}
+                    className="h-8 bg-surface-high border-0 text-sm text-on-surface w-auto flex-1"
+                  />
+                  <CurrencyInput
+                    value={edit.amount}
+                    onValueChange={(v) => updateEdit(editIndex, 'amount', v)}
+                    className="h-8 bg-surface-high border-0 text-sm text-on-surface w-28"
+                    placeholder="0.00"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeScheduleEdit(editIndex)}
+                    className="text-muted-foreground hover:text-status-overdue transition-colors p-1 shrink-0"
+                    title="Remove this schedule"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               );
             })}

@@ -35,27 +35,45 @@ export default function NewLoanPage() {
   const [penaltyRate, setPenaltyRate] = useState('');
   const [penaltyFrequency, setPenaltyFrequency] = useState<'daily' | 'monthly' | 'one_time' | ''>('');
   const [customScheduleDates, setCustomScheduleDates] = useState<Record<number, string>>({});
+  const [customScheduleAmounts, setCustomScheduleAmounts] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [availableToLend, setAvailableToLend] = useState<number | null>(null);
   const router = useRouter();
   const supabase = createClient();
 
   useEffect(() => {
-    const fetchBorrowers = async () => {
+    const fetchData = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data } = await supabase
-        .from('borrowers')
-        .select('*')
-        .eq('lender_id', user.id)
-        .eq('status', 'active')
-        .order('full_name');
+      const [borrowersRes, configRes, loansRes] = await Promise.all([
+        supabase
+          .from('borrowers')
+          .select('*')
+          .eq('lender_id', user.id)
+          .eq('status', 'active')
+          .order('full_name'),
+        supabase
+          .from('lending_configurations')
+          .select('total_loanable_amount')
+          .eq('lender_id', user.id)
+          .single(),
+        supabase
+          .from('loan_entries')
+          .select('principal_amount, status')
+          .eq('lender_id', user.id)
+          .in('status', ['active', 'overdue']),
+      ]);
 
-      if (data) setBorrowers(data);
+      if (borrowersRes.data) setBorrowers(borrowersRes.data);
+
+      const totalLoanable = Number(configRes.data?.total_loanable_amount) || 0;
+      const totalLent = (loansRes.data || []).reduce((sum, l) => sum + Number(l.principal_amount), 0);
+      setAvailableToLend(Math.max(0, totalLoanable - totalLent));
     };
 
-    fetchBorrowers();
+    fetchData();
   }, [supabase]);
 
   const principalNum = parseFloat(principal) || 0;
@@ -94,7 +112,7 @@ export default function NewLoanPage() {
     }
   };
 
-  // Generate schedule preview with customisable dates
+  // Generate schedule preview with customisable dates and amounts
   const loanDateParsed = safeDate(loanDate) ?? new Date();
   const schedulePreview = (() => {
     if (paymentFrequency === 'semi_monthly') {
@@ -104,21 +122,41 @@ export default function NewLoanPage() {
         const monthDate = addMonths(loanDateParsed, i + 1);
         const midIdx = entries.length;
         const lastIdx = midIdx + 1;
-        entries.push({ index: midIdx, date: customScheduleDates[midIdx] ?? format(setDate(monthDate, 15), 'yyyy-MM-dd'), amount: perPayment });
-        entries.push({ index: lastIdx, date: customScheduleDates[lastIdx] ?? format(endOfMonth(monthDate), 'yyyy-MM-dd'), amount: perPayment });
+        entries.push({ index: midIdx, date: customScheduleDates[midIdx] ?? format(setDate(monthDate, 15), 'yyyy-MM-dd'), amount: customScheduleAmounts[midIdx] !== undefined ? (parseFloat(customScheduleAmounts[midIdx]) || 0) : perPayment });
+        entries.push({ index: lastIdx, date: customScheduleDates[lastIdx] ?? format(endOfMonth(monthDate), 'yyyy-MM-dd'), amount: customScheduleAmounts[lastIdx] !== undefined ? (parseFloat(customScheduleAmounts[lastIdx]) || 0) : perPayment });
       }
       return entries;
     }
     return Array.from({ length: durationMonths }, (_, i) => ({
       index: i,
       date: customScheduleDates[i] ?? format(addMonths(loanDateParsed, i + 1), 'yyyy-MM-dd'),
-      amount: monthlyPayment,
+      amount: customScheduleAmounts[i] !== undefined ? (parseFloat(customScheduleAmounts[i]) || 0) : monthlyPayment,
     }));
   })();
 
   const handleScheduleDateChange = (index: number, newDate: string) => {
     setCustomScheduleDates(prev => ({ ...prev, [index]: newDate }));
   };
+
+  const handleScheduleAmountChange = (index: number, newAmount: string) => {
+    setCustomScheduleAmounts(prev => ({ ...prev, [index]: newAmount }));
+  };
+
+  const splitEvenly = () => {
+    if (totalPayments <= 0 || totalAmount <= 0) return;
+    const perPayment = Math.round((totalAmount / totalPayments) * 100) / 100;
+    const newAmounts: Record<number, string> = {};
+    for (let i = 0; i < totalPayments; i++) {
+      newAmounts[i] = i === totalPayments - 1
+        ? String(Math.round((totalAmount - perPayment * (totalPayments - 1)) * 100) / 100)
+        : String(perPayment);
+    }
+    setCustomScheduleAmounts(newAmounts);
+  };
+
+  const scheduleTotal = schedulePreview.reduce((sum, e) => sum + e.amount, 0);
+  const scheduleDiff = Math.abs(scheduleTotal - totalAmount);
+  const hasCustomAmounts = Object.keys(customScheduleAmounts).length > 0;
 
   const selectedBorrowerName = borrowers.find(b => b.id === selectedBorrower)?.full_name;
 
@@ -137,7 +175,7 @@ export default function NewLoanPage() {
         duration_months: durationMonths,
         total_amount: totalAmount,
         due_date: dueDate,
-        notes: notes || null,
+        notes: notes.trim(),
         payment_frequency: paymentFrequency,
         grace_period_days: gracePeriodDays,
         penalty_type: penaltyType || null,
@@ -166,7 +204,9 @@ export default function NewLoanPage() {
   };
 
   const dueDateValid = dueDate && loanDate && new Date(dueDate) > new Date(loanDate);
-  const isValid = selectedBorrower && principalNum > 0 && loanDate && dueDateValid;
+  const scheduleAmountsValid = !hasCustomAmounts || scheduleDiff < 0.02;
+  const withinBudget = availableToLend === null || principalNum <= availableToLend;
+  const isValid = selectedBorrower && principalNum > 0 && loanDate && dueDateValid && notes.trim() && scheduleAmountsValid && withinBudget;
 
   return (
     <div className="space-y-8">
@@ -216,6 +256,12 @@ export default function NewLoanPage() {
             className="h-12 bg-surface-lowest border-0 text-on-surface"
             placeholder="0.00"
           />
+          {availableToLend !== null && (
+            <p className={`text-xs ${principalNum > availableToLend ? 'text-status-overdue' : 'text-muted-foreground'}`}>
+              Available to lend: {formatCurrency(availableToLend)}
+              {principalNum > availableToLend && ' — exceeds available funds'}
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -251,6 +297,11 @@ export default function NewLoanPage() {
             <Label className="text-label-md text-muted-foreground">Loan Duration</Label>
             <span className="text-headline-sm text-on-surface font-medium">
               {durationMonths} {durationMonths === 1 ? 'month' : 'months'}
+              {paymentFrequency === 'semi_monthly' && (
+                <span className="text-label-sm text-muted-foreground font-normal ml-1">
+                  ({totalPayments} payments)
+                </span>
+              )}
             </span>
           </div>
           <div className="relative py-2">
@@ -380,13 +431,16 @@ export default function NewLoanPage() {
         </div>
 
         <div className="space-y-2">
-          <Label className="text-label-md text-muted-foreground">Notes (Optional)</Label>
+          <Label className="text-label-md text-muted-foreground">Notes</Label>
           <Textarea
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             className="bg-surface-lowest border-0 text-on-surface min-h-20 resize-none"
             placeholder="e.g. Purpose of loan, special terms, etc."
           />
+          {!notes.trim() && (
+            <p className="text-xs text-muted-foreground">Required — this helps identify the loan.</p>
+          )}
         </div>
 
         <Button
@@ -434,28 +488,44 @@ export default function NewLoanPage() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-label-md text-muted-foreground">Payment Schedule</h3>
-            <span className="text-label-sm text-muted-foreground">
-              {formatCurrency(paymentAmount)}/{paymentFrequency === 'semi_monthly' ? 'payment' : 'mo'}
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-label-sm text-muted-foreground">
+                {formatCurrency(paymentAmount)}/{paymentFrequency === 'semi_monthly' ? 'payment' : 'mo'}
+              </span>
+              <button
+                type="button"
+                onClick={splitEvenly}
+                className="text-xs text-primary hover:text-primary/80 transition-colors"
+              >
+                Split evenly
+              </button>
+            </div>
           </div>
+          {hasCustomAmounts && (
+            <p className={`text-xs ${scheduleDiff < 0.02 ? 'text-status-ontime' : 'text-status-overdue'}`}>
+              Total: {formatCurrency(scheduleTotal)} / {formatCurrency(totalAmount)}
+              {scheduleDiff >= 0.02 && ` (off by ${formatCurrency(scheduleDiff)})`}
+            </p>
+          )}
           <div className="space-y-1 max-h-64 overflow-y-auto">
             {schedulePreview.map((entry) => (
               <div
                 key={entry.index}
-                className="bg-surface-lowest rounded-md px-4 py-3 flex items-center justify-between gap-2"
+                className="bg-surface-lowest rounded-md px-4 py-3 flex items-center gap-2"
               >
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <span className="text-xs text-muted-foreground w-6">#{entry.index + 1}</span>
-                  <Input
-                    type="date"
-                    value={entry.date}
-                    onChange={(e) => handleScheduleDateChange(entry.index, e.target.value)}
-                    className="h-8 bg-surface-high border-0 text-sm text-on-surface w-auto"
-                  />
-                </div>
-                <span className="text-sm font-medium text-on-surface shrink-0">
-                  {formatCurrency(entry.amount)}
-                </span>
+                <span className="text-xs text-muted-foreground w-6">#{entry.index + 1}</span>
+                <Input
+                  type="date"
+                  value={entry.date}
+                  onChange={(e) => handleScheduleDateChange(entry.index, e.target.value)}
+                  className="h-8 bg-surface-high border-0 text-sm text-on-surface w-auto flex-1"
+                />
+                <CurrencyInput
+                  value={customScheduleAmounts[entry.index] ?? String(entry.amount)}
+                  onValueChange={(v) => handleScheduleAmountChange(entry.index, v)}
+                  className="h-8 bg-surface-high border-0 text-sm text-on-surface w-28"
+                  placeholder="0.00"
+                />
               </div>
             ))}
           </div>

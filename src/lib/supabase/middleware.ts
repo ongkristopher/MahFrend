@@ -38,9 +38,10 @@ export async function updateSession(request: NextRequest) {
     request.nextUrl.pathname.startsWith('/signup');
   const isOnboardingPage = request.nextUrl.pathname.startsWith('/onboarding');
   const isCallbackPage = request.nextUrl.pathname.startsWith('/auth/callback');
+  const isHomePage = request.nextUrl.pathname === '/';
 
-  // Allow callback page always
-  if (isCallbackPage) {
+  // Allow callback and home page always
+  if (isCallbackPage || isHomePage) {
     return supabaseResponse;
   }
 

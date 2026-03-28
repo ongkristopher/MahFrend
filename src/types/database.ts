@@ -70,9 +70,11 @@ export interface PaymentSchedule {
   borrower_id: string;
   due_date: string;
   amount: number;
+  amount_paid: number;
   status: 'pending' | 'paid';
   paid_at: string | null;
   penalty_amount: number;
+  penalty_paid: number;
   created_at: string;
   // Joined
   loan?: LoanEntry;

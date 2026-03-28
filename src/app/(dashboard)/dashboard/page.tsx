@@ -108,12 +108,9 @@ export default function DashboardPage() {
         (sum, l) => sum + (Number(l.total_amount) - Number(l.principal_amount)), 0
       );
 
-      // Total penalties = sum of penalty_amount on paid schedules (collected)
-      // + we can also look at total payments minus what would have been owed without penalties
-      // Simplest: sum penalty_amount from all schedules that were paid (penalty was collected)
+      // Total penalties collected = sum of penalty_paid across all schedules
       const totalPenalties = schedules
-        .filter(s => s.status === 'paid')
-        .reduce((sum, s) => sum + Number(s.penalty_amount), 0);
+        .reduce((sum, s) => sum + (Number(s.penalty_paid) || 0), 0);
 
       setStats({
         active_borrowers: activeBorrowers,
@@ -268,6 +265,17 @@ export default function DashboardPage() {
               {format(calendarMonth, "MMMM yyyy")}
             </h2>
             <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs h-7 px-2"
+                onClick={() => {
+                  setCalendarMonth(new Date());
+                  setSelectedDate(new Date());
+                }}
+              >
+                Today
+              </Button>
               <Button
                 variant="ghost"
                 size="icon"
@@ -442,6 +450,11 @@ export default function DashboardPage() {
                             />
                           )}
                         </div>
+                        {loan.notes && (
+                          <p className="text-[10px] text-muted-foreground truncate mt-0.5">
+                            {loan.notes}
+                          </p>
+                        )}
                         <div className="mt-1 h-1 w-full bg-surface-low rounded-full overflow-hidden">
                           <div
                             className="h-full bg-primary rounded-full"
