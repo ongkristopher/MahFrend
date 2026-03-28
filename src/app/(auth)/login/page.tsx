@@ -157,8 +157,8 @@ export default function LoginPage() {
         </p>
 
         <div className="flex justify-center gap-6 text-label-sm text-muted-foreground">
-          <span>Privacy Policy</span>
-          <span>Terms of Service</span>
+          <Link href="/privacy-policy" className="hover:text-on-surface transition-colors">Privacy Policy</Link>
+          <Link href="/terms-of-service" className="hover:text-on-surface transition-colors">Terms of Service</Link>
         </div>
       </div>
     </div>

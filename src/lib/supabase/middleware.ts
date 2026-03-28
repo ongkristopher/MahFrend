@@ -39,9 +39,12 @@ export async function updateSession(request: NextRequest) {
   const isOnboardingPage = request.nextUrl.pathname.startsWith('/onboarding');
   const isCallbackPage = request.nextUrl.pathname.startsWith('/auth/callback');
   const isHomePage = request.nextUrl.pathname === '/';
+  const isLegalPage =
+    request.nextUrl.pathname.startsWith('/privacy-policy') ||
+    request.nextUrl.pathname.startsWith('/terms-of-service');
 
-  // Allow callback and home page always
-  if (isCallbackPage || isHomePage) {
+  // Allow callback, home, and legal pages always
+  if (isCallbackPage || isHomePage || isLegalPage) {
     return supabaseResponse;
   }
 
