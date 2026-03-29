@@ -26,8 +26,7 @@ export const metadata: Metadata = {
     images: ["/opengraph-image.png"],
   },
   verification: {
-    google:
-      "GMcVpONj52EFs9XZdPUCX7lgCJ8x7lR1W-C3pnx5G1w", // Paste the code from Search Console here
+    google: "bkXPCtdVsmTCJTXOr3psmwBDXU9pqbe9umC88YjTLJI",
   },
 };
 
