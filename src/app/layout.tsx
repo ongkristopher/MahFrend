@@ -25,6 +25,9 @@ export const metadata: Metadata = {
   twitter: {
     images: ["/opengraph-image.png"],
   },
+  verification: {
+    google: "googlef8fb97ee3f43c507", // Paste the code from Search Console here
+  },
 };
 
 export default function RootLayout({
