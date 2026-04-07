@@ -233,7 +233,7 @@ export default function NewLoanPage() {
         <div className="space-y-2">
           <Label className="text-label-md text-muted-foreground">Select User</Label>
           <Select value={selectedBorrower} onValueChange={(v) => setSelectedBorrower(v ?? '')}>
-            <SelectTrigger className="h-12 bg-surface-lowest border-0">
+            <SelectTrigger className="h-12 bg-surface-lowest border-0 w-full">
               <SelectValue placeholder="Select a borrower...">
                 {selectedBorrowerName || undefined}
               </SelectValue>

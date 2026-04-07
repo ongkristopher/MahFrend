@@ -34,7 +34,7 @@ function NewPaymentForm() {
   const [selectedLoan, setSelectedLoan] = useState('');
   const [schedules, setSchedules] = useState<PaymentSchedule[]>([]);
   const [selectedSchedules, setSelectedSchedules] = useState<Set<string>>(new Set());
-  const [amount, setAmount] = useState('');
+  const [manualAmount, setManualAmount] = useState('');
   const [paymentDate, setPaymentDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
@@ -151,9 +151,8 @@ function NewPaymentForm() {
   }, []);
 
   // Auto-fill amount when schedules are selected (includes DB penalties, accounts for partial payments)
-  useEffect(() => {
-    if (selectedSchedules.size > 0) {
-      const total = pendingSchedules
+  const amount = selectedSchedules.size > 0
+    ? pendingSchedules
         .filter(s => selectedSchedules.has(s.id))
         .reduce((sum, s) => {
           const scheduleAmount = Number(s.amount);
@@ -162,10 +161,9 @@ function NewPaymentForm() {
           const totalObligation = scheduleAmount + penalty;
           const effectiveAmount = amountPaid > 0 ? Math.max(0, totalObligation - amountPaid) : totalObligation;
           return sum + effectiveAmount;
-        }, 0);
-      setAmount(total.toFixed(2));
-    }
-  }, [selectedSchedules, schedules]);
+        }, 0)
+        .toFixed(2)
+    : manualAmount;
 
   const remaining = selectedLoanData
     ? Number(selectedLoanData.total_amount) - Number(selectedLoanData.amount_paid)
@@ -285,7 +283,7 @@ function NewPaymentForm() {
         <div className="space-y-2">
           <Label className="text-label-md text-muted-foreground">Account Holder</Label>
           <Select value={selectedBorrower} onValueChange={(v) => setSelectedBorrower(v ?? '')}>
-            <SelectTrigger className="h-12 bg-surface-lowest border-0">
+            <SelectTrigger className="h-12 bg-surface-lowest border-0 w-full">
               <SelectValue placeholder="Select holder...">
                 {selectedBorrowerName || undefined}
               </SelectValue>
@@ -303,7 +301,7 @@ function NewPaymentForm() {
         <div className="space-y-2">
           <Label className="text-label-md text-muted-foreground">Active Loan Entry</Label>
           <Select value={selectedLoan} onValueChange={(v) => setSelectedLoan(v ?? '')} disabled={!selectedBorrower}>
-            <SelectTrigger className="h-12 bg-surface-lowest border-0">
+            <SelectTrigger className="h-12 bg-surface-lowest border-0 w-full">
               <SelectValue placeholder="Select active loan...">
                 {selectedLoanLabel || undefined}
               </SelectValue>
@@ -423,7 +421,7 @@ function NewPaymentForm() {
           <Label className="text-label-md text-muted-foreground">Payment Amount</Label>
           <CurrencyInput
             value={amount}
-            onValueChange={setAmount}
+            onValueChange={setManualAmount}
             className="h-12 bg-surface-lowest border-0 text-on-surface"
             placeholder="0.00"
           />
